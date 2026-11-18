@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "FlipClock",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.dd.shixiongzhidao",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -18,12 +18,34 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "publisher": "师兄知道",
+    "shortDescription": "机械翻页时钟，同时是可注册的 Windows 屏幕保护程序",
+    "longDescription": "FlipClock 是一个机械翻页时钟：设置窗口即时预览，全屏时钟与屏保共用同一块钟面。它还能把自己注册成当前用户的屏幕保护程序——只写 HKCU，安装前记录回滚点，随时可一键还原。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./windows/hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://gitee.com/ShiXiongZhiDao/FlipClock/raw/release/latest.json",
+        "https://github.com/ShiXiongZhiDao/FlipClock/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDNTFENDBDRDlBQURFMkYKUldRdjNxclpETlJSYkJCZlloZzBwSU1aNzJLbG5VejF3UVRzbGRrT21QZ3pwQlE2UGN4WEtWUEIK"
+    }
   }
 }

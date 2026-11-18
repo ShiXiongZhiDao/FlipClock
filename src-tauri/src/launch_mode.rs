@@ -17,6 +17,11 @@ pub enum ParsedLaunch {
     SystemPreview { parent: isize },
     /// `--fullscreen`：应用内全屏时钟。
     Fullscreen,
+    /// `--tray`：开机自启拉起时只驻留托盘，不弹窗口。
+    Tray,
+    /// `--restore-screensaver`：由卸载器在删文件之前调用，把屏保选择还给用户。
+    /// 无界面、无托盘、跑完即退（见 ADR-0014）。
+    RestoreScreensaver,
     /// 没有可识别的参数，形态交给用户设置。
     Unspecified,
 }
@@ -39,6 +44,7 @@ impl LaunchArgs {
         S: Into<OsString>,
     {
         let mut intent = ParsedLaunch::Unspecified;
+        let mut tray_only = false;
         let mut debug_windowed = false;
         let mut window_at = None;
         let mut window_size = None;
@@ -52,6 +58,8 @@ impl LaunchArgs {
                 "s" | "screensaver" => intent = ParsedLaunch::ScreenSaver,
                 "c" | "configure" | "a" => intent = ParsedLaunch::Configure,
                 "fullscreen" => intent = ParsedLaunch::Fullscreen,
+                "tray" => tray_only = true,
+                "restore-screensaver" => intent = ParsedLaunch::RestoreScreensaver,
                 "debug-windowed" => debug_windowed = true,
                 "window-at" => {
                     if let Some((x, y)) = inline_value.as_deref().and_then(parse_point) {
@@ -74,6 +82,12 @@ impl LaunchArgs {
                 }
                 _ => {}
             }
+        }
+
+        // `--tray` 只决定「没有任何窗口类参数」时的形态：`/s --tray` 仍然是屏保，
+        // 否则一次参数拼接就会让屏保变成后台进程。
+        if tray_only && intent == ParsedLaunch::Unspecified {
+            intent = ParsedLaunch::Tray;
         }
 
         LaunchArgs {
@@ -163,5 +177,29 @@ mod tests {
         let args = parse(&["app.exe", "/s", "--debug-windowed"]);
         assert_eq!(args.intent, ParsedLaunch::ScreenSaver);
         assert!(args.debug_windowed);
+    }
+
+    #[test]
+    fn restore_flag_is_its_own_headless_mode() {
+        assert_eq!(
+            parse(&["app.exe", "--restore-screensaver"]).intent,
+            ParsedLaunch::RestoreScreensaver
+        );
+        // 卸载器只认这一个参数；别让它被 --tray 之类的组合吞掉。
+        assert_eq!(
+            parse(&["app.exe", "--tray", "--restore-screensaver"]).intent,
+            ParsedLaunch::RestoreScreensaver
+        );
+    }
+
+    #[test]
+    fn tray_flag_only_applies_without_a_window_mode() {
+        assert_eq!(parse(&["app.exe", "--tray"]).intent, ParsedLaunch::Tray);
+        assert_eq!(parse(&["app.exe", "/tray"]).intent, ParsedLaunch::Tray);
+        // 屏保参数优先：拼接出错时宁可当屏保，也不要悄悄变成后台进程。
+        assert_eq!(
+            parse(&["app.exe", "/s", "--tray"]).intent,
+            ParsedLaunch::ScreenSaver
+        );
     }
 }

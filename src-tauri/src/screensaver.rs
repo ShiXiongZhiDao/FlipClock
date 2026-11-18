@@ -450,6 +450,27 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         }
     });
 
+    // 关窗即退到托盘；真正退出走托盘菜单。设置里关掉这一项就恢复成点 × 直接退出。
+    let close_handle = app.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            let close_to_tray = close_handle
+                .state::<AppState>()
+                .settings
+                .lock()
+                .map(|settings| settings.system.close_to_tray)
+                .unwrap_or(false);
+            if close_to_tray && close_handle.tray_by_id(crate::tray::TRAY_ID).is_some() {
+                api.prevent_close();
+                if let Some(window) = close_handle.get_webview_window(MODE_SETTINGS) {
+                    let _ = window.hide();
+                }
+            } else {
+                close_handle.exit(0);
+            }
+        }
+    });
+
     // 窗口先不显示：前端读完配置后再调 ui_ready 显示，避免先闪一下未渲染的底色。
     // 这里留一个兜底，避免前端出问题时窗口永远不出现。
     let handle = app.clone();

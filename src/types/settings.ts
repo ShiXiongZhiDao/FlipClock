@@ -45,6 +45,8 @@ export interface Settings {
   time: { format: TimeFormat; showDate: boolean; showSeconds: boolean; showColon: boolean };
   sound: { enabled: boolean; volume: number };
   screensaver: { monitorMode: MonitorMode };
+  /** 系统集成。开机自启的状态不在这里，它以注册表为准。 */
+  system: { closeToTray: boolean };
   launch: { noArgMode: NoArgMode };
   registration?: {
     rollbackScrnsaveExe: string | null;
@@ -59,6 +61,7 @@ export interface SettingsPatch {
   sound: Settings["sound"];
   screensaver: Settings["screensaver"];
   launch: Settings["launch"];
+  system: Settings["system"];
 }
 
 export type RegistrationState = "notInstalled" | "installed" | "missing" | "outdated";
@@ -97,5 +100,6 @@ export function defaultSettings(): Settings {
     sound: { enabled: true, volume: 0.6 },
     screensaver: { monitorMode: "primary" },
     launch: { noArgMode: "settings" },
+    system: { closeToTray: true },
   };
 }

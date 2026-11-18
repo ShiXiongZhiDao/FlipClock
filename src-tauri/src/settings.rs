@@ -60,6 +60,8 @@ pub struct Settings {
     #[serde(default)]
     pub launch: LaunchSettings,
     #[serde(default)]
+    pub system: SystemSettings,
+    #[serde(default)]
     pub registration: Registration,
 }
 
@@ -72,6 +74,7 @@ impl Default for Settings {
             sound: SoundSettings::default(),
             screensaver: ScreenSaverSettings::default(),
             launch: LaunchSettings::default(),
+            system: SystemSettings::default(),
             registration: Registration::default(),
         }
     }
@@ -271,6 +274,24 @@ pub struct ScreenSaverSettings {
     pub monitor_mode: MonitorMode,
 }
 
+/// 系统集成。开机自启的**状态**不在这里存——它以注册表为准，
+/// 否则用户在任务管理器里禁用之后，配置里还会写着「开启」。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemSettings {
+    /// 关闭设置窗口时隐藏到托盘，而不是退出整个应用。
+    #[serde(default = "yes")]
+    pub close_to_tray: bool,
+}
+
+impl Default for SystemSettings {
+    fn default() -> Self {
+        Self {
+            close_to_tray: true,
+        }
+    }
+}
+
 impl Default for ScreenSaverSettings {
     fn default() -> Self {
         Self {
@@ -425,6 +446,7 @@ mod tests {
         assert!(!s.time.show_colon);
         assert_eq!(s.screensaver.monitor_mode, MonitorMode::Primary);
         assert_eq!(s.launch.no_arg_mode, NoArgMode::Settings);
+        assert!(s.system.close_to_tray);
     }
 
     #[test]
@@ -469,6 +491,14 @@ mod tests {
         let raw = serde_json::json!({ "appearance": { "digitLayout": "per-digit" } });
         let appearance: Appearance = section(&raw, "appearance").unwrap();
         assert_eq!(appearance.digit_layout, DigitLayout::PerDigit);
+    }
+
+    #[test]
+    fn old_settings_without_system_section_default_to_close_to_tray() {
+        let raw = serde_json::json!({ "appearance": { "theme": "oled-black" } });
+        let settings: Settings = serde_json::from_value(raw).expect("老配置应能反序列化");
+        // 老配置没有 system 段时，缺省行为必须是「关窗退到托盘」，否则托盘成了孤儿。
+        assert!(settings.system.close_to_tray);
     }
 
     #[test]

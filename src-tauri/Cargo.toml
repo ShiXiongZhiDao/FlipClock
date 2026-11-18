@@ -1,6 +1,6 @@
 [package]
 name = "flipclock"
-version = "0.1.0"
+version = "1.0.0"
 description = "FlipClock - a mechanical split-flap clock for Windows with a real .scr screen saver entry"
 authors = ["dd"]
 edition = "2024"
@@ -21,7 +21,16 @@ tauri-build = { version = "2", features = [] }
 custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
+# 二次启动只唤起已有实例：托盘常驻后，否则会出现两个托盘图标、两份设置状态。
+tauri-plugin-single-instance = "2"
+# 自动更新（ADR-0013）：端点与公钥在 tauri.conf.json 的 plugins.updater 里。
+# 它只认「安装包」——Windows 上下载完会执行 NSIS 安装器，由安装器替换文件；
+# 便携版（裸 exe）没有安装器可跑，所以前端只在安装版里显示「下载并安装」。
+tauri-plugin-updater = "2"
+# 装完之后重启自己。Windows 上进程会被安装器结束，这个调用实际很少走到，
+# 但装完不重启的路径（例如用户取消安装器）需要它把界面拉回来。
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -37,8 +46,11 @@ windows = { version = "0.62", features = [
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
-codegen-units = 1
-lto = true
+# 曾经是 codegen-units = 1 + lto = true（胖 LTO）。对一个屏保程序来说，那样每次
+# 发布构建要 4~5 分钟，而省下的体积不到一成——等待比几 MB 更贵。
+# 现在用 thin LTO + 16 个 codegen 单元，兼顾体积与构建时间。
+codegen-units = 16
+lto = "thin"
 opt-level = 3
 panic = "abort"
 strip = true

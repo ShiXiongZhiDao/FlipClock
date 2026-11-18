@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -7,15 +8,21 @@ import AppearancePage from "./pages/AppearancePage.vue";
 import ClockPage from "./pages/ClockPage.vue";
 import ScreenSaverPage from "./pages/ScreenSaverPage.vue";
 import SoundPage from "./pages/SoundPage.vue";
+import SystemPage from "./pages/SystemPage.vue";
 import TimePage from "./pages/TimePage.vue";
 import { useSettings } from "../composables/useSettings";
 import { isTauri } from "../lib/env";
+import { useUpdater } from "../lib/updater";
 import {
   GLASS_TRANSPARENCY_MAX,
   GLASS_TRANSPARENCY_MIN,
 } from "../types/settings";
 
 const { settings, loaded, error, flush, load, reset } = useSettings();
+
+/** 版本号只在「关于」与侧栏出现；启动时取一次就够。 */
+const versionText = ref("");
+const { scheduleAutoCheck } = useUpdater();
 
 /** 滑杆存的是“透明度”，CSS 要的是“不透明度”；范围与滑杆、后端共用同一组常量。 */
 const glassAlpha = computed(
@@ -27,7 +34,7 @@ const glassAlpha = computed(
     ),
 );
 
-type PageId = "clock" | "appearance" | "time" | "sound" | "screensaver";
+type PageId = "clock" | "appearance" | "time" | "sound" | "screensaver" | "system";
 
 interface PageDef {
   id: PageId;
@@ -66,6 +73,12 @@ const PAGES: PageDef[] = [
     label: "屏幕保护程序",
     icon: "▣",
     title: "屏幕保护程序",
+  },
+  {
+    id: "system",
+    label: "系统",
+    icon: "⚙",
+    title: "系统",
   },
 ];
 
@@ -113,6 +126,13 @@ function restoreDefaults() {
 
 onMounted(async () => {
   await load();
+
+  if (isTauri()) {
+    versionText.value = await getVersion().catch(() => "");
+    // 设置窗口出现 5 秒后再查更新（ADR-0013）：不跟启动抢带宽，
+    // 查到也只在「系统 → 关于」里亮一行，不弹窗打断。
+    scheduleAutoCheck();
+  }
 
   // 关窗前把防抖队列里的最后一次修改落盘；保存失败就不关，别静默丢设置。
   if (appWindow) {
@@ -184,7 +204,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="sidebar-bottom">
-          <div class="version">FLIPCLOCK · V0.1.0</div>
+          <div class="version">FLIPCLOCK · V{{ versionText || "—" }}</div>
         </div>
       </aside>
 
@@ -204,6 +224,7 @@ onBeforeUnmount(() => {
           <AppearancePage v-else-if="page === 'appearance'" />
           <TimePage v-else-if="page === 'time'" />
           <SoundPage v-else-if="page === 'sound'" />
+          <SystemPage v-else-if="page === 'system'" />
           <ScreenSaverPage v-else />
         </div>
       </main>

@@ -1,7 +1,7 @@
 {
   "name": "flipclock",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,11 +9,17 @@
     "build:app": "tauri build --no-bundle",
     "preview": "vite preview",
     "tauri": "tauri",
-    "scr": "node scripts/package-scr.mjs"
+    "scr": "node scripts/package-scr.mjs",
+    "ship": "pnpm build:app && pnpm scr",
+    "check:version": "node scripts/check-version.mjs",
+    "release": "node scripts/release.mjs",
+    "check:public": "node scripts/check-public.mjs"
   },
   "dependencies": {
     "vue": "^3.5.13",
-    "@tauri-apps/api": "^2"
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",

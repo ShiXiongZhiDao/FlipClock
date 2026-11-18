@@ -49,6 +49,7 @@ function patchOf(): SettingsPatch {
     sound: { ...settings.sound },
     screensaver: { ...settings.screensaver },
     launch: { ...settings.launch },
+    system: { ...settings.system },
   };
 }
 
@@ -127,6 +128,9 @@ async function load() {
         showSeconds: remote.time?.showSeconds ?? settings.time.showSeconds,
         showColon: remote.time?.showColon ?? false,
       };
+      settings.system = {
+        closeToTray: remote.system?.closeToTray ?? true,
+      };
       settings.sound = {
         enabled: remote.sound?.enabled ?? settings.sound.enabled,
         volume: clamp(
@@ -154,6 +158,7 @@ function reset() {
   settings.sound = base.sound;
   settings.screensaver = base.screensaver;
   settings.launch = base.launch;
+  settings.system = base.system;
 }
 
 export function useSettings() {

@@ -97,11 +97,16 @@ mod imp {
     }
 
     pub fn read_desktop_string(name: &str) -> Option<String> {
+        read_hkcu_string(DESKTOP_KEY, name)
+    }
+
+    /// 读 `HKCU` 下一个字符串值。安装器写在卸载键里的 `InstallLocation` 也走这里。
+    pub fn read_hkcu_string(subkey: &str, name: &str) -> Option<String> {
         unsafe {
             let mut key = HKEY::default();
             let opened = RegOpenKeyExW(
                 HKEY_CURRENT_USER,
-                &HSTRING::from(DESKTOP_KEY),
+                &HSTRING::from(subkey),
                 Some(0),
                 KEY_QUERY_VALUE,
                 &mut key,
@@ -214,6 +219,9 @@ mod imp {
         false
     }
     pub fn read_desktop_string(_name: &str) -> Option<String> {
+        None
+    }
+    pub fn read_hkcu_string(_subkey: &str, _name: &str) -> Option<String> {
         None
     }
     pub fn write_desktop_string(_name: &str, _value: &str) -> Result<(), String> {

@@ -2,12 +2,14 @@
 //! 不能直接读写注册表、不能拼命令字符串。
 
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
+use crate::autostart;
 use crate::install::{self, ScreenSaverStatus};
 use crate::screensaver::{self, AppState};
 use crate::settings::{
-    self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SoundSettings, TimeSettings,
+    self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SoundSettings, SystemSettings,
+    TimeSettings,
 };
 
 /// 前端只能改这几段。注册信息（回滚点、安装路径）由后端独占，
@@ -20,9 +22,24 @@ pub struct SettingsPatch {
     pub sound: SoundSettings,
     pub screensaver: ScreenSaverSettings,
     pub launch: LaunchSettings,
+    pub system: SystemSettings,
 }
 
 /// 前端准备好之后调用：这时才把设置窗口显示出来，避免闪一下不透明底色。
+#[tauri::command]
+pub fn autostart_status() -> bool {
+    autostart::is_enabled()
+}
+
+/// 开关写的是注册表，不是配置：立刻生效，且以实际写入结果为准。
+#[tauri::command]
+pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    autostart::set_enabled(enabled)?;
+    // 设置页与托盘菜单共用同一份事实，两边都要刷新。
+    let _ = app.emit("autostart-changed", enabled);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn ui_ready(window: tauri::WebviewWindow) {
     let _ = window.show();
@@ -60,6 +77,7 @@ pub async fn save_settings(
     guard.sound.volume = settings::clamp_sound_volume(guard.sound.volume);
     guard.screensaver = patch.screensaver;
     guard.launch = patch.launch;
+    guard.system = patch.system;
 
     settings::save(&app, &guard)?;
     Ok(guard.clone())
@@ -80,6 +98,13 @@ pub fn end_screensaver(app: AppHandle) {
 #[tauri::command]
 pub fn screensaver_status(app: AppHandle) -> Result<ScreenSaverStatus, String> {
     install::status(&app)
+}
+
+/// 前端据此决定「下载并安装」按钮出不出现：只有安装版能被安装器替换，
+/// 便携版的更新只能自己下载新包（ADR-0013）。
+#[tauri::command]
+pub fn is_installed_build() -> bool {
+    install::is_installed_build()
 }
 
 #[tauri::command]
@@ -135,12 +160,14 @@ mod tests {
             },
             "sound": { "enabled": true, "volume": 0.6 },
             "screensaver": { "monitorMode": "primary" },
-            "launch": { "noArgMode": "settings" }
+            "launch": { "noArgMode": "settings" },
+            "system": { "closeToTray": false }
         });
 
         let patch: SettingsPatch = serde_json::from_value(raw).expect("patch 载荷应能反序列化");
         assert_eq!(patch.appearance.digit_layout, DigitLayout::PerPair);
         assert_eq!(patch.appearance.font, crate::settings::DigitFont::Bahnschrift);
         assert!(patch.time.show_colon);
+        assert!(!patch.system.close_to_tray);
     }
 }
