@@ -140,6 +140,19 @@ See [CHANGELOG.md](./CHANGELOG.md) for what changed between releases, and [THIRD
 
 GNU General Public License v3.0 — see [LICENSE](./LICENSE). The bundled Bebas Neue font is distributed under the SIL Open Font License; see `src/assets/fonts/OFL.txt` and [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
-## Contact
+## ☕ Support the author
 
-Bugs, ideas, and questions: <https://github.com/ShiXiongZhiDao/FlipClock/issues>.
+If FlipClock made your desktop a little nicer, you can buy the author a coffee — projects like this
+live on that. The QR codes below are loaded from a public image repository, not bundled with the app.
+
+| Alipay | WeChat Pay |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/alipay.png" width="150" alt="Alipay QR code"> | <img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/wechat-pay.png" width="150" alt="WeChat Pay QR code"> |
+
+## 📮 Contact
+
+- Website: [shixiongzhidao.cn](https://shixiongzhidao.cn)
+- Issues: [GitHub Issues](https://github.com/ShiXiongZhiDao/FlipClock/issues)
+- WeChat channel: **师兄知道** — the same one shown in the app's *System → About* screen.
+
+<img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/wechat-official.png" width="560" alt="WeChat official channel banner and QR code">

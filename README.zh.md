@@ -140,6 +140,19 @@ pnpm scr            # 复制为 dist-scr/FlipClock.exe 与 FlipClock.scr
 
 GNU GPL v3.0，见 [LICENSE](./LICENSE)。随包的 Bebas Neue 字体按 SIL Open Font License 分发，见 `src/assets/fonts/OFL.txt` 与 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
-## 联系
+## ☕ 赞助作者
 
-问题、想法与反馈：<https://github.com/ShiXiongZhiDao/FlipClock/issues>。
+如果 FlipClock 让你的桌面好看了一点，可以请作者喝杯咖啡——这类小工具就靠这个继续做下去。
+下面的收款码从公开图片仓库加载，不随安装包分发。
+
+| 支付宝 | 微信支付 |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/alipay.png" width="150" alt="支付宝收款码"> | <img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/wechat-pay.png" width="150" alt="微信支付收款码"> |
+
+## 📮 联系
+
+- 个人主页：[shixiongzhidao.cn](https://shixiongzhidao.cn)
+- 问题反馈：[GitHub Issues](https://github.com/ShiXiongZhiDao/FlipClock/issues)
+- 微信公众号：**师兄知道**——软件里「系统 → 关于作者」展示的是同一个。
+
+<img src="https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/wechat-official.png" width="560" alt="微信公众号二维码横幅">

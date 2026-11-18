@@ -9,6 +9,41 @@ import { isTauri } from "../../lib/env";
 import { useUpdater } from "../../lib/updater";
 import type { ScreenSaverStatus } from "../../types/settings";
 
+/**
+ * 二维码与公众号横幅走公开仓库，不进安装包：换图不必重发版本，
+ * 包体也不为几张码变大。镜像目录结构必须一致，失败时露出纯文字兜底。
+ */
+const QR_MIRRORS = [
+  "https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/",
+  "https://gitee.com/ShiXiongZhiDao/BrandAssets/raw/main/images/about/",
+];
+const WEBSITE_URL = "https://shixiongzhidao.cn";
+const ISSUES_URL = "https://github.com/ShiXiongZhiDao/FlipClock/issues";
+
+/**
+ * 顺序回退：GitHub 不通换 Gitee，都试过就藏图露字。
+ * 不做 Promise.any 竞速——那套状态机在这里没有测试框架兜底，简单更可信。
+ */
+function loadQr(img: HTMLImageElement) {
+  const attempt = Number(img.dataset.try ?? "0");
+  if (attempt >= QR_MIRRORS.length) {
+    img.hidden = true;
+    const slot = img.closest(".qr-slot");
+    if (slot) slot.classList.add("failed");
+    return;
+  }
+  img.dataset.try = String(attempt + 1);
+  img.onerror = () => loadQr(img);
+  img.src = QR_MIRRORS[attempt] + (img.dataset.qr ?? "");
+}
+
+/** 页面挂载后再取图：模板还没渲染时 querySelector 拿不到节点。 */
+function wireQrImages() {
+  for (const img of document.querySelectorAll<HTMLImageElement>("#about-cards img[data-qr]")) {
+    loadQr(img);
+  }
+}
+
 const { settings } = useSettings();
 
 /** 自启状态不来自配置文件，而是每次读注册表——任务管理器里禁用也要能反映出来。 */
@@ -134,6 +169,7 @@ const updateAction = computed<"check" | "install" | null>(() => {
 });
 
 onMounted(async () => {
+  wireQrImages();
   if (!isTauri()) return;
   version.value = await getVersion();
   await Promise.all([refreshAutostart(), loadInstallKind()]);
@@ -255,6 +291,48 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </section>
+
+    <!-- 关于作者、公众号与赞助：图片一律走远端仓库，不占安装包体积。 -->
+    <div id="about-cards" class="about-cards">
+      <section class="card">
+        <div class="card-title">关于作者</div>
+        <p class="about-text">
+          FlipClock 由「师兄知道」制作。个人主页、源码与反馈入口都在下面，公众号与收款码
+          从公开图片仓库实时加载，不随安装包分发。
+        </p>
+        <div class="about-links">
+          <a class="ghost-button" :href="WEBSITE_URL" target="_blank" rel="noopener noreferrer">
+            官网
+          </a>
+          <a class="ghost-button" :href="ISSUES_URL" target="_blank" rel="noopener noreferrer">
+            问题反馈
+          </a>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">关注公众号</div>
+        <div class="qr-slot qr-banner">
+          <img data-qr="wechat-official.png" alt="微信公众号「师兄知道」二维码" referrerpolicy="no-referrer" />
+          <p class="qr-fail">图片源暂时连不上，可在微信里直接搜「师兄知道」。</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">赞助作者</div>
+        <p class="about-text">喜欢的话可以请作者喝杯咖啡，不影响功能。</p>
+        <div class="qr-row">
+          <div class="qr-slot qr-tile">
+            <img data-qr="alipay.png" alt="支付宝收款码" referrerpolicy="no-referrer" />
+            <p class="qr-fail">支付宝收款码暂时加载不出来。</p>
+          </div>
+          <div class="qr-slot qr-tile">
+            <img data-qr="wechat-pay.png" alt="微信支付收款码" referrerpolicy="no-referrer" />
+            <p class="qr-fail">微信收款码暂时加载不出来。</p>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -392,5 +470,80 @@ onBeforeUnmount(() => {
 
 .system-message.err {
   color: var(--ui-danger);
+}
+
+.about-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.about-text {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ui-text-secondary);
+}
+
+.about-links {
+  display: flex;
+  gap: 8px;
+}
+
+.about-links .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.qr-row {
+  display: flex;
+  gap: 14px;
+}
+
+.qr-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  border-radius: 8px;
+  background: var(--ui-track, var(--ui-bg));
+  overflow: hidden;
+}
+
+.qr-slot img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.qr-tile {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
+
+.qr-tile img {
+  width: 132px;
+}
+
+.qr-banner img {
+  width: 100%;
+  max-width: 420px;
+}
+
+.qr-fail {
+  display: none;
+  margin: 0;
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+
+.qr-slot.failed .qr-fail {
+  display: block;
 }
 </style>
