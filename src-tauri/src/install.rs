@@ -101,8 +101,22 @@ pub fn refresh_if_outdated() -> Result<bool, String> {
         return Ok(false);
     }
 
-    fs::copy(&source, &target).map_err(|e| format!("刷新屏保组件失败：{e}"))?;
+    replace_component(&source, &target)?;
     Ok(true)
+}
+
+/// 先写临时文件再改名。
+///
+/// 直接覆盖会在写入中途留下半截 `.scr`，而 Windows 随时可能拉起那个文件；
+/// 同卷改名是原子的，最坏情况是旧版本继续留着，而不是一个跑不起来的屏保。
+fn replace_component(source: &PathBuf, target: &PathBuf) -> Result<(), String> {
+    let temp = target.with_extension("scr.new");
+    fs::copy(source, &temp).map_err(|e| format!("写入屏保组件失败：{e}"))?;
+    if let Err(error) = fs::rename(&temp, target) {
+        let _ = fs::remove_file(&temp);
+        return Err(format!("替换屏保组件失败：{error}"));
+    }
+    Ok(())
 }
 
 /// 分块比较两个文件是否逐字节相同，避免为了判断版本而引入哈希依赖。
@@ -180,7 +194,7 @@ pub fn install(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
 
     let source = current_exe()?;
     if source != target && !files_equal(&source, &target) {
-        fs::copy(&source, &target).map_err(|e| format!("复制屏保组件失败：{e}"))?;
+        replace_component(&source, &target)?;
     }
 
     let target_text = target.to_string_lossy().to_string();

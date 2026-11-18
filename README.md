@@ -17,9 +17,9 @@
   装完之后可以在应用内「系统 → 关于」检查并安装更新。
 - **便携版**：`FlipClock_<版本>_x64-portable.zip`，解压即用。
   它能检查更新，但没有安装器可跑，新版本要手动下载。
-- 国内镜像：<https://gitee.com/ShiXiongZhiDao/FlipClock/releases>
+- 国内镜像：<https://gitee.com/ShiXiongZhiDao/FlipClock/releases>（同步 Release 附件，含安装包）
 
-更新包带 minisign 签名，更新源为 Gitee 优先、GitHub 兜底。
+更新包带 minisign 签名，更新源为 Gitee 优先、GitHub 兜底，应用内「系统 → 关于」可检查并安装。
 
 ## 构建
 
@@ -31,7 +31,6 @@ pnpm build          # 前端类型检查 + 构建
 pnpm tauri dev      # 开发
 pnpm build:app      # release 构建，前端内嵌进二进制
 pnpm scr            # 复制为 dist-scr/FlipClock.exe 与 FlipClock.scr
-pnpm check:version  # 三处版本号一致性
 ```
 
 不要用裸 `cargo build --release`：缺 `custom-protocol` 特性时前端不会被内嵌，双击只会看到 localhost 拒绝连接。
