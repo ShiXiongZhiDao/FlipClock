@@ -1,0 +1,194 @@
+/* 设置界面里反复出现的控件：分段选择、开关、按钮、行、徽标。
+   放在全局而不是每个页面各写一遍，避免四份样式慢慢漂移。 */
+
+.card {
+  background-color: var(--ui-surface);
+  background-image: var(--ui-sheen);
+  border: 1px solid var(--ui-divider);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--ui-card-shadow, none);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.row-name {
+  font-size: 11.5px;
+  color: var(--ui-text);
+}
+
+.divider {
+  height: 1px;
+  background: var(--ui-divider);
+  margin: 1px -1px;
+}
+
+/* 分段选择 */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--ui-track, var(--ui-bg));
+  border: 1px solid var(--ui-divider);
+  border-radius: var(--radius-control);
+  flex: none;
+}
+
+/* .stretch 只负责横向铺满，不能写成 flex:1 —— 卡片是竖向 flex，
+   flex:1 会让分段控件在竖直方向吃掉整个卡片高度。 */
+.segmented.stretch {
+  flex: none;
+  width: 100%;
+}
+
+.segmented.stretch > button {
+  flex: 1;
+}
+
+.segmented button {
+  padding: 6px 11px;
+  font-size: 10.5px;
+  color: var(--ui-text-muted);
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmented button:hover {
+  color: var(--ui-text);
+}
+
+.segmented button.selected {
+  background: var(--ui-thumb, var(--ui-surface-2));
+  color: var(--ui-text);
+  box-shadow: var(--ui-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.22));
+}
+
+/* 开关 */
+.switch {
+  width: var(--ui-switch-w, 36px);
+  height: var(--ui-switch-h, 20px);
+  flex: none;
+  padding: var(--ui-switch-pad, 2px);
+  border-radius: 20px;
+  background: var(--ui-track, var(--ui-surface-2));
+  transition: background 0.18s ease;
+}
+
+.switch i {
+  display: block;
+  width: var(--ui-knob, 16px);
+  height: var(--ui-knob, 16px);
+  border-radius: 50%;
+  background: var(--ui-knob-off, #9ba09d);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.switch.on {
+  background: var(--ui-switch-on, var(--ui-accent));
+}
+
+.switch.on i {
+  transform: translateX(var(--ui-knob-travel, 16px));
+  background: var(--ui-knob-on, #211e18);
+}
+
+/* 按钮 */
+.primary,
+.secondary {
+  padding: 9px 16px;
+  font-size: 11px;
+  border-radius: 999px;
+  transition: 0.16s ease;
+  white-space: nowrap;
+}
+
+.primary {
+  background: var(--ui-primary-bg, var(--ui-accent));
+  color: var(--ui-primary-ink, var(--ui-accent-ink));
+  font-weight: 700;
+  border: 1px solid var(--ui-primary-border, var(--ui-accent-line));
+  box-shadow: var(--ui-primary-shadow, none);
+}
+
+.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.secondary {
+  border: 1px solid var(--ui-divider);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--ui-accent-line);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 提示与标签 */
+.stage,
+.theme-stage {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 18px 40px -14px rgba(30, 55, 44, 0.38);
+}
+
+/* 深色时钟面板上盖一层极淡反光，让它像被玻璃罩住的屏幕，而不是一块黑洞 */
+.stage::after,
+.theme-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    128deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.06) 18%,
+    rgba(255, 255, 255, 0) 42%
+  );
+}
+
+.mono-path {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-muted);
+  word-break: break-all;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-divider);
+}

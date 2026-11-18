@@ -1,0 +1,54 @@
+/* 时钟主题：只定义翻页卡的色彩，不涉及布局。 */
+
+@font-face {
+  font-family: "Bebas Neue";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("../assets/fonts/BebasNeue-Regular.woff2") format("woff2");
+}
+
+[data-clock-theme="classic-dark"] {
+  --clock-bg: #111315;
+  --clock-glow: rgba(255, 255, 255, 0.04);
+  --card-top: #303437;
+  --card-top-end: #2b2f32;
+  --card-bottom-start: #282c2f;
+  --card-bottom: #24282b;
+  --digit: #f1f0e9;
+  --digit-shadow: rgba(255, 255, 255, 0.1);
+  --seam: rgba(0, 0, 0, 0.72);
+  --seam-light: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 0.6em 1.4em rgba(0, 0, 0, 0.32);
+  --date-color: #9ba19f;
+}
+
+[data-clock-theme="oled-black"] {
+  --clock-bg: #000000;
+  --clock-glow: rgba(255, 255, 255, 0.025);
+  --card-top: #202020;
+  --card-top-end: #1c1c1c;
+  --card-bottom-start: #161616;
+  --card-bottom: #101010;
+  --digit: #f8f8f8;
+  --digit-shadow: rgba(255, 255, 255, 0.06);
+  --seam: rgba(0, 0, 0, 0.85);
+  --seam-light: rgba(255, 255, 255, 0.04);
+  --card-shadow: 0 0.6em 1.4em rgba(0, 0, 0, 0.55);
+  --date-color: #8a8a8a;
+}
+
+[data-clock-theme="retro-light"] {
+  --clock-bg: #ddd4c5;
+  --clock-glow: rgba(255, 255, 255, 0.35);
+  --card-top: #403d37;
+  --card-top-end: #3b3832;
+  --card-bottom-start: #2e2b26;
+  --card-bottom: #292722;
+  --digit: #f3ecdf;
+  --digit-shadow: rgba(255, 255, 255, 0.12);
+  --seam: rgba(0, 0, 0, 0.78);
+  --seam-light: rgba(255, 255, 255, 0.14);
+  --card-shadow: 0 0.6em 1.4em rgba(70, 54, 32, 0.22);
+  --date-color: #716b60;
+}

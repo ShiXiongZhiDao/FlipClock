@@ -1,0 +1,90 @@
+/* 界面层令牌：只管界面外观，不管时钟配色。
+
+   配色原则：薄荷、墨、黄铜。
+   底色是一整块低饱和的薄荷绿，文字用带一点绿调的墨色（不是蓝黑，也不是暖褐），
+   面板靠白色玻璃而不是第二种色相分层。
+   唯一的暖色是左上角的黄铜品牌块，那是产品身份，不是装饰。 */
+:root {
+  --ui-bg: #d9ece2;
+  /* 玻璃面板的不透明度（0–1）。设置窗口会把它覆盖成用户拖的值；
+     卡片、侧栏、主题横幅都读这一个数。 */
+  --ui-glass: 0.52;
+  --ui-sidebar: rgba(255, 255, 255, var(--ui-glass));
+  --ui-surface: rgba(255, 255, 255, var(--ui-glass));
+  --ui-surface-2: rgba(255, 255, 255, 0.95);
+
+  --ui-text: #16221c;
+  --ui-text-secondary: #4e5c55;
+  --ui-text-muted: #7f9088;
+
+  /* 强调色就是墨色本身：选中、按钮靠明度和体量区分，不靠色相 */
+  --ui-accent: #14221b;
+  --ui-accent-ink: #ffffff;
+  --ui-accent-line: rgba(20, 34, 27, 0.24);
+  --ui-accent-line-strong: rgba(20, 34, 27, 0.55);
+  --ui-accent-soft: rgba(20, 34, 27, 0.06);
+  --ui-accent-halo: rgba(20, 34, 27, 0.12);
+
+  --ui-brand-from: #e2c286;
+  --ui-brand-to: #9c783c;
+  --ui-brand-shadow: rgba(156, 120, 60, 0.22);
+
+  --ui-divider: rgba(20, 34, 27, 0.09);
+  --ui-danger: #a8473a;
+  --ui-success: #2f6f53;
+  --ui-warn: #a9752f;
+
+  /* 左上打一束白光，右下压一层薄荷绿，让整块底不是平涂的色卡 */
+  --ui-shell-bg:
+    radial-gradient(52% 42% at 0% -10%, rgba(240, 252, 246, 0.95) 0%, rgba(240, 252, 246, 0) 36%),
+    linear-gradient(114deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 22%),
+    radial-gradient(86% 70% at 104% 4%, rgba(130, 182, 158, 0.95), transparent 58%),
+    radial-gradient(74% 60% at 44% 118%, rgba(114, 169, 145, 0.88), transparent 62%),
+    linear-gradient(180deg, #e2f4eb 0%, #bcdcca 100%);
+
+  /* 面板自带的斜向掠光：光从左上来，到底部散尽。
+     没有这一层，半透明白面板看起来就是一块平整的色块。
+     各档亮度按 0.52 的默认不透明度折算，滑杆调小时跟着一起淡下去。 */
+  --ui-sheen: linear-gradient(
+    156deg,
+    rgba(255, 255, 255, calc(var(--ui-glass) * 1.635)) 0%,
+    rgba(255, 255, 255, calc(var(--ui-glass) * 0.654)) 22%,
+    rgba(255, 255, 255, calc(var(--ui-glass) * 0.115)) 44%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  /* 投影更软更远，左上亮边、右下暗边，模拟玻璃的厚度与高光 */
+  --ui-card-shadow:
+    0 38px 70px -32px rgba(30, 58, 46, 0.3),
+    0 4px 12px rgba(30, 58, 46, 0.07),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -20px 32px -30px rgba(30, 58, 46, 0.26);
+  --ui-track: rgba(20, 34, 27, 0.07);
+  --ui-thumb: #ffffff;
+  --ui-thumb-shadow: 0 1px 2px rgba(20, 34, 27, 0.16), 0 1px 6px rgba(20, 34, 27, 0.06);
+  --ui-scroll: rgba(20, 34, 27, 0.18);
+
+  --ui-primary-bg: #14221b;
+  --ui-primary-ink: #ffffff;
+  --ui-primary-border: transparent;
+  --ui-primary-shadow: 0 8px 18px rgba(20, 34, 27, 0.18);
+
+  /* 开关开启态也用墨色，避免在一片薄荷里突然跳出一块荧光绿 */
+  --ui-switch-on: #14221b;
+  --ui-knob: 16px;
+  --ui-knob-off: #ffffff;
+  --ui-knob-on: #ffffff;
+  --ui-knob-travel: 16px;
+
+  --radius-shell: 18px;
+  --radius-panel: 22px;
+  --radius-sidebar: 24px;
+  --radius-card: 15px;
+  --radius-control: 11px;
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-digit: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+
+  color-scheme: light;
+}

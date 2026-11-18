@@ -1,0 +1,56 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* 窗口本身已经不透明，圆角由 Rust 侧的窗口区域裁；这层底色只是兜底，
+     让区域内、壳体外的极窄边缘不露出 WebView 的默认底色。 */
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* 屏保与预览里绝不能出现光标和滚动条。 */
+.stage-host {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
