@@ -6,7 +6,7 @@ import { playFlipSound } from "../../lib/flipSound";
 import { t } from "../../lib/i18n";
 import { SOUND_VOLUME_MAX, SOUND_VOLUME_MIN } from "../../types/settings";
 
-const { settings } = useSettings();
+const { settings, toggleSound } = useSettings();
 
 const VOLUME_MIN = Math.round(SOUND_VOLUME_MIN * 100);
 const VOLUME_MAX = Math.round(SOUND_VOLUME_MAX * 100);
@@ -19,14 +19,6 @@ const volumePercent = computed({
     settings.sound.enabled = value > 0;
   },
 });
-
-/** 关掉时保留音量，重新打开还是原来的响度；音量恰好为 0 时给一个能听见的默认值。 */
-function toggle() {
-  settings.sound.enabled = !settings.sound.enabled;
-  if (settings.sound.enabled && settings.sound.volume <= 0) {
-    settings.sound.volume = 0.6;
-  }
-}
 
 /** 试听失败要说出来，不能点了没反应也不解释。 */
 const problem = ref<string | null>(null);
@@ -54,7 +46,7 @@ function audition() {
           role="switch"
           :aria-checked="settings.sound.enabled"
           :class="{ on: settings.sound.enabled }"
-          @click="toggle"
+          @click="toggleSound"
         >
           <i></i>
         </button>

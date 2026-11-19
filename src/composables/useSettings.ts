@@ -164,6 +164,17 @@ async function load() {
   await loading;
 }
 
+/**
+ * 音效开关。关掉时保留音量，重新打开时若音量为 0 就补一个能听见的默认值。
+ * 快速设置与「声音」页共用这一份逻辑，避免两处开关行为漂移。
+ */
+function toggleSound() {
+  settings.sound.enabled = !settings.sound.enabled;
+  if (settings.sound.enabled && settings.sound.volume <= 0) {
+    settings.sound.volume = 0.6;
+  }
+}
+
 /** 只重置用户可改的几段，不动注册信息与回滚点。 */
 function reset() {
   const base = defaultSettings();
@@ -177,5 +188,5 @@ function reset() {
 }
 
 export function useSettings() {
-  return { settings, loaded, error, load, flush, reset };
+  return { settings, loaded, error, load, flush, reset, toggleSound };
 }

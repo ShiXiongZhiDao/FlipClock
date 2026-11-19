@@ -7,7 +7,7 @@ import { t } from "../../lib/i18n";
 import { THEME_LABELS, type Theme, type TimeFormat } from "../../types/settings";
 
 const { now } = useClock();
-const { settings } = useSettings();
+const { settings, toggleSound } = useSettings();
 const { scalePercent, previewScale, SCALE_MIN, SCALE_MAX, SCALE_STEP } = useClockScale();
 
 const THEMES: Theme[] = ["classic-dark", "oled-black", "retro-light"];
@@ -70,22 +70,6 @@ function setTheme(theme: Theme) {
         </div>
       </div>
 
-      <div class="scale-block">
-        <div class="scale-head">
-          <span class="row-name">{{ t("clock.scale") }}</span>
-          <span class="scale-value">{{ scalePercent }}%</span>
-        </div>
-        <input
-          v-model.number="scalePercent"
-          class="range"
-          type="range"
-          :min="SCALE_MIN"
-          :max="SCALE_MAX"
-          :step="SCALE_STEP"
-          :aria-label="t('clock.scaleAria')"
-        />
-      </div>
-
       <div class="row">
         <div class="row-copy">
           <span class="row-name">{{ t("time.showDate") }}</span>
@@ -142,6 +126,42 @@ function setTheme(theme: Theme) {
           </span>
           <small>{{ t(THEME_LABELS[theme]) }}</small>
         </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div class="row-copy">
+          <span class="row-name">{{ t("sound.enable") }}</span>
+        </div>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          :aria-checked="settings.sound.enabled"
+          :class="{ on: settings.sound.enabled }"
+          @click="toggleSound"
+        >
+          <i></i>
+        </button>
+      </div>
+
+      <!-- 缩放放最后：它改的是整块钟面的大小，和上面的开关性质不同，
+           放在开关行之后才不会把「开/关」的节奏打断。 -->
+      <div class="scale-block">
+        <div class="scale-head">
+          <span class="row-name">{{ t("clock.scale") }}</span>
+          <span class="scale-value">{{ scalePercent }}%</span>
+        </div>
+        <input
+          v-model.number="scalePercent"
+          class="range"
+          type="range"
+          :min="SCALE_MIN"
+          :max="SCALE_MAX"
+          :step="SCALE_STEP"
+          :aria-label="t('clock.scaleAria')"
+        />
       </div>
     </aside>
   </div>
