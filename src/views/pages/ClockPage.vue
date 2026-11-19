@@ -146,6 +146,8 @@ function setTheme(theme: Theme) {
         </button>
       </div>
 
+      <div class="divider"></div>
+
       <!-- 缩放放最后：它改的是整块钟面的大小，和上面的开关性质不同，
            放在开关行之后才不会把「开/关」的节奏打断。 -->
       <div class="scale-block">
