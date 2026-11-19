@@ -7,9 +7,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::autostart;
 use crate::install::{self, ScreenSaverStatus};
 use crate::screensaver::{self, AppState};
+use crate::errors::AppError;
 use crate::settings::{
     self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SoundSettings, SystemSettings,
-    TimeSettings,
+    TimeSettings, UiSettings,
 };
 
 /// 前端只能改这几段。注册信息（回滚点、安装路径）由后端独占，
@@ -23,6 +24,7 @@ pub struct SettingsPatch {
     pub screensaver: ScreenSaverSettings,
     pub launch: LaunchSettings,
     pub system: SystemSettings,
+    pub ui: UiSettings,
 }
 
 /// 前端准备好之后调用：这时才把设置窗口显示出来，避免闪一下不透明底色。
@@ -46,13 +48,31 @@ pub fn ui_ready(window: tauri::WebviewWindow) {
     let _ = window.set_focus();
 }
 
+/// 前端把生效语言（只有 zh/en）推过来，Rust 重建托盘菜单。
+/// 偏好三态不进 Rust——它不知道系统语言，归并归前端做。
+#[tauri::command]
+pub fn set_locale(app: AppHandle, locale: String) -> Result<(), String> {
+    let language = match locale.as_str() {
+        "zh" => crate::tray::Language::Zh,
+        "en" => crate::tray::Language::En,
+        _ => {
+            return Err(AppError::SetLocaleFailed {
+                detail: format!("unsupported locale: {locale}"),
+            }
+            .into())
+        }
+    };
+    crate::tray::set_language(&app, language)
+        .map_err(|e| AppError::SetLocaleFailed { detail: e.to_string() }.into())
+}
+
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
     state
         .settings
         .lock()
         .map(|s| s.clone())
-        .map_err(|_| "配置状态不可用".to_string())
+        .map_err(|_| AppError::ConfigUnavailable.into())
 }
 
 #[tauri::command]
@@ -64,7 +84,7 @@ pub async fn save_settings(
     let mut guard = state
         .settings
         .lock()
-        .map_err(|_| "配置状态不可用".to_string())?;
+        .map_err(|_| String::from(AppError::ConfigUnavailable))?;
 
     guard.appearance = patch.appearance;
     // 前端滑杆限了范围，这里再兜一次；边界只来自 settings::clamp_*。
@@ -78,6 +98,7 @@ pub async fn save_settings(
     guard.screensaver = patch.screensaver;
     guard.launch = patch.launch;
     guard.system = patch.system;
+    guard.ui = patch.ui;
 
     settings::save(&app, &guard)?;
     Ok(guard.clone())
@@ -137,7 +158,12 @@ fn about_link_url(key: &str) -> Result<&'static str, String> {
         .iter()
         .find(|(k, _)| *k == key)
         .map(|(_, url)| *url)
-        .ok_or_else(|| format!("未知的外链标识：{key}"))
+        .ok_or_else(|| {
+            AppError::UnknownAboutLink {
+                key: key.to_string(),
+            }
+            .into()
+        })
 }
 
 #[tauri::command]
@@ -149,7 +175,10 @@ pub fn open_about_link(key: String) -> Result<(), String> {
         .args(["/c", "start", "", url])
         .spawn()
         .map(|_| ())
-        .map_err(|e| format!("打开浏览器失败：{e}"))
+        .map_err(|e| AppError::OpenBrowserFailed {
+            detail: e.to_string(),
+        }
+        .into())
 }
 
 /// 从全屏时钟回到设置窗口。先开设置窗口再关全屏窗口，
@@ -191,7 +220,8 @@ mod tests {
             "sound": { "enabled": true, "volume": 0.6 },
             "screensaver": { "monitorMode": "primary" },
             "launch": { "noArgMode": "settings" },
-            "system": { "closeToTray": false }
+            "system": { "closeToTray": false },
+            "ui": { "language": "system" }
         });
 
         let patch: SettingsPatch = serde_json::from_value(raw).expect("patch 载荷应能反序列化");
@@ -199,6 +229,7 @@ mod tests {
         assert_eq!(patch.appearance.font, crate::settings::DigitFont::Bahnschrift);
         assert!(patch.time.show_colon);
         assert!(!patch.system.close_to_tray);
+        assert_eq!(patch.ui.language, crate::settings::LanguagePreference::System);
     }
 
     #[test]

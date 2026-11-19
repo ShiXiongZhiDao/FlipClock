@@ -3,6 +3,7 @@ import { computed, watch } from "vue";
 
 import FlipGroup from "./FlipGroup.vue";
 import { playFlipSound } from "../../lib/flipSound";
+import { locale } from "../../lib/i18n";
 import type { DigitFont, DigitLayout, Theme, TimeFormat } from "../../types/settings";
 
 const props = defineProps<{
@@ -71,9 +72,12 @@ watch(stamp, () => {
   playFlipSound(props.sound.volume);
 });
 
-const locale = navigator.language || "en-US";
+// 日期行跟「生效语言」走，不再独立读 navigator.language（ADR-0018）：
+// 用户选了英文界面就不该看到中文日期。固定用 zh-CN/en-US 两个 locale，
+// 与 i18n 的归并规则一致，也避免地区变体带来的格式漂移。
+const dateLocale = computed(() => (locale.value === "zh" ? "zh-CN" : "en-US"));
 const dateText = computed(() => {
-  const formatted = new Intl.DateTimeFormat(locale, {
+  const formatted = new Intl.DateTimeFormat(dateLocale.value, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -81,7 +85,7 @@ const dateText = computed(() => {
 
   // 中文里「月」「日」在 ICU 里是 literal 而不是 month/day 字段，
   // 所以不能按 parts 拼，只能整串取再补一个空格。
-  if (locale.toLowerCase().startsWith("zh")) {
+  if (locale.value === "zh") {
     return formatted.replace(/\s*(周[一二三四五六日天])/, " $1");
   }
   return formatted.replace(/,/g, " · ").toUpperCase();

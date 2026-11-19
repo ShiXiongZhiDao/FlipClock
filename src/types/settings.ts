@@ -1,5 +1,7 @@
 export type Theme = "classic-dark" | "oled-black" | "retro-light";
 export type TimeFormat = "24h" | "12h";
+/** 界面语言偏好。system = 跟随系统，启动时归并为中文或英文。 */
+export type LanguagePreference = "system" | "zh" | "en";
 export type MonitorMode = "primary" | "all";
 export type NoArgMode = "settings" | "fullscreen";
 /** 每张翻页卡承载几位数字。per-digit = 一位一卡，per-pair = 两位一卡（方卡）。 */
@@ -56,6 +58,8 @@ export interface Settings {
   screensaver: { monitorMode: MonitorMode };
   /** 系统集成。开机自启的状态不在这里，它以注册表为准。 */
   system: { closeToTray: boolean };
+  /** 界面文字语言。只影响文字，不影响钟面数字的字体。 */
+  ui: { language: LanguagePreference };
   launch: { noArgMode: NoArgMode };
   registration?: {
     rollbackScrnsaveExe: string | null;
@@ -71,6 +75,7 @@ export interface SettingsPatch {
   screensaver: Settings["screensaver"];
   launch: Settings["launch"];
   system: Settings["system"];
+  ui: Settings["ui"];
 }
 
 export type RegistrationState = "notInstalled" | "installed" | "missing" | "outdated";
@@ -82,16 +87,16 @@ export interface ScreenSaverStatus {
   rollbackAvailable: boolean;
 }
 
-export const THEME_LABELS: Record<Theme, string> = {
-  "classic-dark": "经典碳灰",
-  "oled-black": "OLED 纯黑",
-  "retro-light": "复古暖白",
+export const THEME_LABELS: Record<Theme, import("../lib/i18n").MessageKey> = {
+  "classic-dark": "appearance.theme.classicDark",
+  "oled-black": "appearance.theme.oledBlack",
+  "retro-light": "appearance.theme.retroLight",
 };
 
-export const FONT_LABELS: Record<DigitFont, string> = {
-  bebas: "Bebas Neue",
-  bahnschrift: "Bahnschrift",
-  system: "系统默认",
+export const FONT_LABELS: Record<DigitFont, import("../lib/i18n").MessageKey> = {
+  bebas: "appearance.font.bebas",
+  bahnschrift: "appearance.font.bahnschrift",
+  system: "appearance.font.systemDefault",
 };
 
 export function defaultSettings(): Settings {
@@ -110,5 +115,6 @@ export function defaultSettings(): Settings {
     screensaver: { monitorMode: "primary" },
     launch: { noArgMode: "settings" },
     system: { closeToTray: true },
+    ui: { language: "system" },
   };
 }

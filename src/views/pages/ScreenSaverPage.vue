@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 
 import { useSettings } from "../../composables/useSettings";
 import { isTauri } from "../../lib/env";
+import { errorText, t, type MessageKey } from "../../lib/i18n";
 import type {
   MonitorMode,
   NoArgMode,
@@ -18,15 +19,17 @@ const busy = ref(false);
 const message = ref<{ tone: "ok" | "err"; text: string } | null>(null);
 let messageTimer: ReturnType<typeof setTimeout> | undefined;
 
-const STATUS_TEXT: Record<RegistrationState, { label: string; tone: string }> = {
-  notInstalled: { label: "未安装", tone: "idle" },
-  installed: { label: "已安装", tone: "ok" },
-  missing: { label: "文件缺失", tone: "err" },
-  outdated: { label: "版本不匹配", tone: "warn" },
+const STATUS_TEXT: Record<RegistrationState, { key: MessageKey; tone: string }> = {
+  notInstalled: { key: "saver.status.notInstalled", tone: "idle" },
+  installed: { key: "saver.status.installed", tone: "ok" },
+  missing: { key: "saver.status.missing", tone: "err" },
+  outdated: { key: "saver.status.outdated", tone: "warn" },
 };
 
 const statusInfo = computed(() =>
-  status.value ? STATUS_TEXT[status.value.state] : null,
+  status.value
+    ? { label: t(STATUS_TEXT[status.value.state].key), tone: STATUS_TEXT[status.value.state].tone }
+    : null,
 );
 
 const deployed = computed(() => status.value?.state === "installed");
@@ -42,7 +45,7 @@ async function refresh() {
   try {
     status.value = await invoke<ScreenSaverStatus>("screensaver_status");
   } catch (e) {
-    notify("err", String(e));
+    notify("err", errorText(e));
   }
 }
 
@@ -50,9 +53,9 @@ async function install() {
   busy.value = true;
   try {
     status.value = await invoke<ScreenSaverStatus>("install_screensaver");
-    notify("ok", "屏保组件已就位，并已设为当前屏保");
+    notify("ok", t("saver.installToast"));
   } catch (e) {
-    notify("err", String(e));
+    notify("err", errorText(e));
   } finally {
     busy.value = false;
   }
@@ -62,9 +65,9 @@ async function restore() {
   busy.value = true;
   try {
     status.value = await invoke<ScreenSaverStatus>("restore_screensaver");
-    notify("ok", "已恢复安装前的屏保设置");
+    notify("ok", t("saver.restoreToast"));
   } catch (e) {
-    notify("err", String(e));
+    notify("err", errorText(e));
   } finally {
     busy.value = false;
   }
@@ -74,7 +77,7 @@ async function openSystemSettings() {
   try {
     await invoke("open_windows_screensaver_settings");
   } catch (e) {
-    notify("err", String(e));
+    notify("err", errorText(e));
   }
 }
 
@@ -93,7 +96,7 @@ onMounted(refresh);
   <div class="saver-page">
     <section class="card main">
       <div class="card-title">
-        Windows 屏幕保护程序
+        {{ t("saver.windowsTitle") }}
         <span v-if="statusInfo" class="status" :class="statusInfo.tone">
           {{ statusInfo.label }}
         </span>
@@ -101,10 +104,10 @@ onMounted(refresh);
 
       <div class="actions">
         <button class="primary" type="button" :disabled="busy" @click="install">
-          {{ deployed ? "重新部署屏保组件" : "安装并设为当前屏保" }}
+          {{ t(deployed ? "saver.redeploy" : "saver.install") }}
         </button>
         <button class="secondary" type="button" @click="openSystemSettings">
-          打开 Windows 屏保设置
+          {{ t("saver.openSettings") }}
         </button>
         <button
           v-if="status?.rollbackAvailable"
@@ -113,7 +116,7 @@ onMounted(refresh);
           :disabled="busy"
           @click="restore"
         >
-          恢复原屏保
+          {{ t("saver.restoreOriginal") }}
         </button>
       </div>
 
@@ -124,62 +127,62 @@ onMounted(refresh);
       <div class="divider"></div>
 
       <div class="kv">
-        <span>系统当前指向</span>
-        <span class="kv-value">{{ status?.activePath || "（未设置，即屏保为「无」）" }}</span>
-        <span>组件版本</span>
+        <span>{{ t("saver.currentTarget") }}</span>
+        <span class="kv-value">{{ status?.activePath || t("saver.notSet") }}</span>
+        <span>{{ t("saver.componentVersion") }}</span>
         <span class="kv-value">
           {{
             status?.state === "installed"
-              ? "与当前程序一致"
+              ? t("saver.versionMatch")
               : status?.state === "outdated"
-                ? "与当前程序不一致，建议重新部署"
+                ? t("saver.versionMismatch")
                 : "—"
           }}
         </span>
-        <span>回滚点</span>
+        <span>{{ t("saver.rollbackPoint") }}</span>
         <span class="kv-value">
-          {{ status?.rollbackAvailable ? "已记录安装前的设置" : "无（安装前系统本就没有设置）" }}
+          {{ status?.rollbackAvailable ? t("saver.rollbackRecorded") : t("saver.rollbackNone") }}
         </span>
       </div>
     </section>
 
     <aside class="side">
       <div class="card">
-        <div class="card-title">多显示器</div>
+        <div class="card-title">{{ t("saver.monitorTitle") }}</div>
         <div class="segmented stretch">
           <button
             type="button"
             :class="{ selected: settings.screensaver.monitorMode === 'primary' }"
             @click="setMonitorMode('primary')"
           >
-            主显示器
+            {{ t("saver.monitorPrimary") }}
           </button>
           <button
             type="button"
             :class="{ selected: settings.screensaver.monitorMode === 'all' }"
             @click="setMonitorMode('all')"
           >
-            所有显示器
+            {{ t("saver.monitorAll") }}
           </button>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">启动</div>
+        <div class="card-title">{{ t("common.startup") }}</div>
         <div class="segmented stretch">
           <button
             type="button"
             :class="{ selected: settings.launch.noArgMode === 'settings' }"
             @click="setNoArgMode('settings')"
           >
-            打开设置窗口
+            {{ t("saver.launchSettings") }}
           </button>
           <button
             type="button"
             :class="{ selected: settings.launch.noArgMode === 'fullscreen' }"
             @click="setNoArgMode('fullscreen')"
           >
-            直接全屏
+            {{ t("saver.launchFullscreen") }}
           </button>
         </div>
       </div>

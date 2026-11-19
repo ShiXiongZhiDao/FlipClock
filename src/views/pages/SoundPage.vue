@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 
 import { useSettings } from "../../composables/useSettings";
 import { playFlipSound } from "../../lib/flipSound";
+import { t } from "../../lib/i18n";
 import { SOUND_VOLUME_MAX, SOUND_VOLUME_MIN } from "../../types/settings";
 
 const { settings } = useSettings();
@@ -33,19 +34,19 @@ const problem = ref<string | null>(null);
 function audition() {
   problem.value = null;
   const result = playFlipSound(settings.sound.volume);
-  if (result === "unsupported") problem.value = "此环境无法播放音效";
-  else if (result === "muted") problem.value = "音量为 0，先把音量调高";
+  if (result === "unsupported") problem.value = t("sound.unsupported");
+  else if (result === "muted") problem.value = t("sound.muted");
 }
 </script>
 
 <template>
   <div class="sound-page">
     <section class="card sound-card">
-      <div class="card-title">翻页音效</div>
+      <div class="card-title">{{ t("sound.title") }}</div>
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">启用音效</span>
+          <span class="row-name">{{ t("sound.enable") }}</span>
         </div>
         <button
           type="button"
@@ -63,7 +64,7 @@ function audition() {
 
       <div class="volume-block" :class="{ dim: !settings.sound.enabled }">
         <div class="volume-head">
-          <span class="row-name">音量</span>
+          <span class="row-name">{{ t("sound.volume") }}</span>
           <span class="volume-value">{{ volumePercent }}%</span>
         </div>
         <input
@@ -74,14 +75,14 @@ function audition() {
           :max="VOLUME_MAX"
           step="1"
           :disabled="!settings.sound.enabled"
-          aria-label="翻页音效音量"
+          :aria-label="t('sound.volumeAria')"
         />
       </div>
 
       <div class="audition">
-        <button type="button" class="secondary" @click="audition">试听</button>
+        <button type="button" class="secondary" @click="audition">{{ t("sound.audition") }}</button>
         <span class="audition-note" :class="{ warn: !!problem }">
-          {{ problem ?? "仅在全屏时钟与屏保中发声" }}
+          {{ problem ?? t("sound.stageOnly") }}
         </span>
       </div>
     </section>

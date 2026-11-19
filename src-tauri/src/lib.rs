@@ -1,5 +1,6 @@
 mod autostart;
 mod commands;
+mod errors;
 mod install;
 mod launch_mode;
 mod platform;
@@ -139,6 +140,7 @@ pub fn run() {
             commands::autostart_status,
             commands::set_autostart,
             commands::ui_ready,
+            commands::set_locale,
         ])
         .build(tauri::generate_context!())
         .expect("error while running FlipClock")

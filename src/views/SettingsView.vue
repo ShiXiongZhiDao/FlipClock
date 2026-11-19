@@ -12,6 +12,7 @@ import SystemPage from "./pages/SystemPage.vue";
 import TimePage from "./pages/TimePage.vue";
 import { useSettings } from "../composables/useSettings";
 import { isTauri } from "../lib/env";
+import { errorText, t, type MessageKey } from "../lib/i18n";
 import { useUpdater } from "../lib/updater";
 import {
   GLASS_TRANSPARENCY_MAX,
@@ -38,48 +39,17 @@ type PageId = "clock" | "appearance" | "time" | "sound" | "screensaver" | "syste
 
 interface PageDef {
   id: PageId;
-  label: string;
+  label: MessageKey;
   icon: string;
-  title: string;
 }
 
 const PAGES: PageDef[] = [
-  {
-    id: "clock",
-    label: "时钟预览",
-    icon: "◷",
-    title: "时钟预览",
-  },
-  {
-    id: "appearance",
-    label: "外观主题",
-    icon: "◈",
-    title: "外观主题",
-  },
-  {
-    id: "time",
-    label: "时间与日期",
-    icon: "◔",
-    title: "时间与日期",
-  },
-  {
-    id: "sound",
-    label: "声音",
-    icon: "♪",
-    title: "声音",
-  },
-  {
-    id: "screensaver",
-    label: "屏幕保护程序",
-    icon: "▣",
-    title: "屏幕保护程序",
-  },
-  {
-    id: "system",
-    label: "系统",
-    icon: "⚙",
-    title: "系统",
-  },
+  { id: "clock", label: "nav.clock", icon: "◷" },
+  { id: "appearance", label: "nav.appearance", icon: "◈" },
+  { id: "time", label: "nav.time", icon: "◔" },
+  { id: "sound", label: "nav.sound", icon: "♪" },
+  { id: "screensaver", label: "nav.screensaver", icon: "▣" },
+  { id: "system", label: "nav.system", icon: "⚙" },
 ];
 
 const page = ref<PageId>("clock");
@@ -107,22 +77,22 @@ function notify(text: string) {
 
 // 保存成功不再占用页面文字；失败仍然要让人看见。
 watch(error, (value) => {
-  if (value) notify(`保存失败：${value}`);
+  if (value) notify(t("settings.saveFailed", { error: errorText(value) }));
 });
 
 async function preview() {
   try {
     await invoke("preview_screensaver");
   } catch (e) {
-    notify(String(e));
+    notify(errorText(e));
   }
 }
 
 function restoreDefaults() {
   // 图标按钮没有文字说明，误点代价高：确认一次再清全部设置。
-  if (!window.confirm("恢复默认设置？当前的外观、时间与声音设置会被清除。")) return;
+  if (!window.confirm(t("settings.restoreConfirm"))) return;
   reset();
-  notify("已恢复默认设置");
+  notify(t("settings.restoreSuccess"));
 }
 
 onMounted(async () => {
@@ -145,7 +115,7 @@ onMounted(async () => {
         if (loaded.value) {
           await flush();
           if (error.value) {
-            notify(`保存失败：${error.value}`);
+            notify(t("settings.saveFailed", { error: errorText(error.value) }));
             return;
           }
         }
@@ -174,8 +144,8 @@ onBeforeUnmount(() => {
           <button
             class="icon-action"
             type="button"
-            title="恢复默认设置"
-            aria-label="恢复默认设置"
+            :title="t('titlebar.restoreDefaults')"
+            :aria-label="t('titlebar.restoreDefaults')"
             @click="restoreDefaults"
           >
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -186,8 +156,8 @@ onBeforeUnmount(() => {
           <button
             class="icon-action"
             type="button"
-            title="预览屏保"
-            aria-label="预览屏保"
+            :title="t('titlebar.previewSaver')"
+            :aria-label="t('titlebar.previewSaver')"
             @click="preview"
           >
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -196,8 +166,8 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="traffic">
-          <button class="light light-min" type="button" title="最小化" aria-label="最小化" @click="minimize"></button>
-          <button class="light light-close" type="button" title="关闭" aria-label="关闭" @click="closeWindow"></button>
+          <button class="light light-min" type="button" :title="t('titlebar.minimize')" :aria-label="t('titlebar.minimize')" @click="minimize"></button>
+          <button class="light light-close" type="button" :title="t('titlebar.close')" :aria-label="t('titlebar.close')" @click="closeWindow"></button>
         </div>
       </header>
 
@@ -211,7 +181,7 @@ onBeforeUnmount(() => {
               :class="{ active: page === item.id }"
               @click="page = item.id"
             >
-              <span class="ico">{{ item.icon }}</span>{{ item.label }}
+              <span class="ico">{{ item.icon }}</span>{{ t(item.label) }}
             </button>
           </nav>
         </div>

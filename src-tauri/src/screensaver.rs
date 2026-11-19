@@ -10,6 +10,7 @@ use tauri::{
     WebviewWindowBuilder,
 };
 
+use crate::errors::AppError;
 use crate::platform;
 use crate::settings::{MonitorMode, Settings};
 
@@ -120,16 +121,20 @@ pub fn compute_bounds(app: &AppHandle, mode: MonitorMode, debug: bool) -> Result
     let monitors = match mode {
         MonitorMode::Primary => app
             .primary_monitor()
-            .map_err(|e| format!("读取主显示器失败：{e}"))?
+            .map_err(|e| AppError::ReadPrimaryMonitorFailed {
+                detail: e.to_string(),
+            })?
             .into_iter()
             .collect(),
         MonitorMode::All => app
             .available_monitors()
-            .map_err(|e| format!("枚举显示器失败：{e}"))?,
+            .map_err(|e| AppError::EnumerateMonitorsFailed {
+                detail: e.to_string(),
+            })?,
     };
 
     if monitors.is_empty() {
-        return Err("没有可用的显示器".into());
+        return Err(String::from(AppError::NoMonitor));
     }
 
     Ok(monitors
@@ -166,14 +171,23 @@ fn create_window(
         .additional_browser_args(IMMERSIVE_BROWSER_ARGS)
         .initialization_script(boot_script(&payload))
         .build()
-        .map_err(|e| format!("创建窗口 {label} 失败：{e}"))?;
+        .map_err(|e| AppError::CreateWindowFailed {
+            label: label.to_string(),
+            detail: e.to_string(),
+        })?;
 
     window
         .set_position(PhysicalPosition::new(bounds.x, bounds.y))
-        .map_err(|e| format!("定位窗口 {label} 失败：{e}"))?;
+        .map_err(|e| AppError::LocateWindowFailed {
+            label: label.to_string(),
+            detail: e.to_string(),
+        })?;
     window
         .set_size(PhysicalSize::new(bounds.width, bounds.height))
-        .map_err(|e| format!("调整窗口 {label} 尺寸失败：{e}"))?;
+        .map_err(|e| AppError::ResizeWindowFailed {
+            label: label.to_string(),
+            detail: e.to_string(),
+        })?;
 
     if payload.exit_on_input {
         let _ = window.set_cursor_visible(false);
@@ -181,7 +195,10 @@ fn create_window(
 
     window
         .show()
-        .map_err(|e| format!("显示窗口 {label} 失败：{e}"))?;
+        .map_err(|e| AppError::ShowWindowFailed {
+            label: label.to_string(),
+            detail: e.to_string(),
+        })?;
     let _ = window.set_focus();
     Ok(window)
 }
@@ -417,16 +434,22 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
             debug_windowed: false,
         }))
         .build()
-        .map_err(|e| format!("打开设置窗口失败：{e}"))?;
+        .map_err(|e| AppError::OpenSettingsWindowFailed {
+            detail: e.to_string(),
+        })?;
 
     // 圆角由窗口区域裁出来，不依赖透明窗口：Windows 10 的 DWM 透明在
     // 「透明效果」关闭时会合成成黑边，靠不住。见 platform.rs。
     let scale = window
         .scale_factor()
-        .map_err(|e| format!("读取窗口缩放失败：{e}"))?;
+        .map_err(|e| AppError::ReadWindowScaleFailed {
+            detail: e.to_string(),
+        })?;
     let size = window
         .inner_size()
-        .map_err(|e| format!("读取窗口尺寸失败：{e}"))?;
+        .map_err(|e| AppError::ReadWindowSizeFailed {
+            detail: e.to_string(),
+        })?;
     platform::set_round_window_region(&window, size.width, size.height, scale, SHELL_RADIUS)?;
 
     // 跨到不同 DPI 的显示器时物理尺寸会变，区域要按新尺寸重建。
@@ -488,7 +511,7 @@ pub fn open_fullscreen_clock(app: &AppHandle, debug_windowed: bool) -> Result<()
     let bounds = compute_bounds(app, MonitorMode::Primary, debug_windowed)?
         .into_iter()
         .next()
-        .ok_or("没有可用的显示器")?;
+        .ok_or(String::from(AppError::NoMonitor))?;
 
     let window = create_window(
         app,
@@ -512,7 +535,7 @@ pub fn open_fullscreen_clock(app: &AppHandle, debug_windowed: bool) -> Result<()
 /// 系统设置里的预览框保持空白，同时不会留下一个看不见的进程。
 pub fn start_system_preview(_app: &AppHandle, parent: isize) -> Result<(), String> {
     if !platform::is_valid_window(parent) {
-        return Err("Windows 传入的预览父窗口无效".into());
+        return Err(String::from(AppError::InvalidPreviewParent));
     }
-    Err("系统预览暂未支持：内置 WebView 无法稳定嵌入系统预览框".into())
+    Err(String::from(AppError::SystemPreviewUnsupported))
 }

@@ -4,6 +4,7 @@ import { computed } from "vue";
 import FlipClock from "../../components/clock/FlipClock.vue";
 import { useClock } from "../../composables/useClock";
 import { useSettings } from "../../composables/useSettings";
+import { t } from "../../lib/i18n";
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
@@ -72,15 +73,15 @@ const transparency = computed({
 
         <div class="theme-meta">
           <div class="theme-name">
-            {{ THEME_LABELS[theme] }}
-            <span v-if="settings.appearance.theme === theme" class="tick">✓ 使用中</span>
+            {{ t(THEME_LABELS[theme]) }}
+            <span v-if="settings.appearance.theme === theme" class="tick">{{ t("appearance.inUse") }}</span>
           </div>
         </div>
       </button>
     </div>
 
     <div class="card clock-style-card">
-      <div class="card-title">数字外观</div>
+      <div class="card-title">{{ t("appearance.digitLook") }}</div>
 
       <div class="font-options">
         <button
@@ -93,7 +94,7 @@ const transparency = computed({
           @click="settings.appearance.font = font"
         >
           <span class="font-sample">12</span>
-          <small>{{ FONT_LABELS[font] }}</small>
+          <small>{{ t(FONT_LABELS[font]) }}</small>
         </button>
       </div>
 
@@ -101,7 +102,7 @@ const transparency = computed({
 
       <div class="brightness-block">
         <div class="brightness-head">
-          <span class="row-name">亮度</span>
+          <span class="row-name">{{ t("appearance.brightness") }}</span>
           <span class="brightness-value">{{ brightnessPercent }}%</span>
         </div>
         <input
@@ -111,15 +112,15 @@ const transparency = computed({
           :min="BRIGHTNESS_MIN_PERCENT"
           :max="BRIGHTNESS_MAX_PERCENT"
           step="5"
-          aria-label="时钟亮度"
+          :aria-label="t('appearance.brightnessAria')"
         />
       </div>
     </div>
 
     <div class="card glass-card">
       <div class="glass-head">
-        <span class="card-title">界面玻璃</span>
-        <span class="glass-value">{{ transparency }}% 透</span>
+        <span class="card-title">{{ t("appearance.uiGlass") }}</span>
+        <span class="glass-value">{{ t("appearance.transparencySuffix", { percent: transparency }) }}</span>
       </div>
       <input
         v-model.number="transparency"
@@ -128,7 +129,7 @@ const transparency = computed({
         :min="GLASS_MIN"
         :max="GLASS_MAX"
         step="1"
-        aria-label="界面玻璃透明度"
+        :aria-label="t('appearance.glassAria')"
       />
     </div>
   </div>

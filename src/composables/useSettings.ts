@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { reactive, ref, watch } from "vue";
 
 import { isTauri } from "../lib/env";
+import { applyLanguage } from "../lib/i18n";
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
@@ -50,6 +51,7 @@ function patchOf(): SettingsPatch {
     screensaver: { ...settings.screensaver },
     launch: { ...settings.launch },
     system: { ...settings.system },
+    ui: { ...settings.ui },
   };
 }
 
@@ -72,6 +74,14 @@ watch(
     timer = setTimeout(flush, 200);
   },
   { deep: true },
+);
+
+// 语言偏好独立监听：切换界面文字要比 200ms 的落盘防抖更早，
+// 而且托盘重建走的是另一条命令，不跟着 save_settings 走。
+watch(
+  () => settings.ui.language,
+  (language) => applyLanguage(language),
+  { immediate: true },
 );
 
 async function load() {
@@ -141,6 +151,10 @@ async function load() {
       };
       settings.screensaver = remote.screensaver ?? settings.screensaver;
       settings.launch = remote.launch ?? settings.launch;
+      const language = remote.ui?.language;
+      settings.ui = {
+        language: language === "zh" || language === "en" || language === "system" ? language : "system",
+      };
       settings.registration = remote.registration;
       loaded.value = true;
     } catch (e) {
@@ -159,6 +173,7 @@ function reset() {
   settings.screensaver = base.screensaver;
   settings.launch = base.launch;
   settings.system = base.system;
+  settings.ui = base.ui;
 }
 
 export function useSettings() {

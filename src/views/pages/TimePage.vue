@@ -3,6 +3,7 @@ import FlipClock from "../../components/clock/FlipClock.vue";
 import { useClock } from "../../composables/useClock";
 import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
+import { t } from "../../lib/i18n";
 import type { DigitLayout, TimeFormat } from "../../types/settings";
 
 const { now } = useClock();
@@ -22,7 +23,7 @@ function setLayout(layout: DigitLayout) {
   <div class="time-page">
     <section class="sample-card">
       <div class="card-head">
-        <strong>当前样式</strong>
+        <strong>{{ t("time.currentStyle") }}</strong>
       </div>
       <div class="stage">
         <FlipClock
@@ -42,21 +43,21 @@ function setLayout(layout: DigitLayout) {
     </section>
 
     <aside class="card">
-      <div class="card-title">时间制式</div>
+      <div class="card-title">{{ t("time.format") }}</div>
       <div class="segmented stretch">
         <button
           type="button"
           :class="{ selected: settings.time.format === '24h' }"
           @click="setFormat('24h')"
         >
-          24 小时
+          {{ t("time.format24") }}
         </button>
         <button
           type="button"
           :class="{ selected: settings.time.format === '12h' }"
           @click="setFormat('12h')"
         >
-          12 小时
+          {{ t("time.format12") }}
         </button>
       </div>
 
@@ -64,7 +65,7 @@ function setLayout(layout: DigitLayout) {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示日期与星期</span>
+          <span class="row-name">{{ t("time.showDate") }}</span>
         </div>
         <button
           type="button"
@@ -80,7 +81,7 @@ function setLayout(layout: DigitLayout) {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示秒数</span>
+          <span class="row-name">{{ t("time.showSeconds") }}</span>
         </div>
         <button
           type="button"
@@ -96,7 +97,7 @@ function setLayout(layout: DigitLayout) {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示时间冒号</span>
+          <span class="row-name">{{ t("time.showColon") }}</span>
         </div>
         <button
           type="button"
@@ -113,28 +114,28 @@ function setLayout(layout: DigitLayout) {
       <div class="divider"></div>
 
       <div class="layout-block">
-        <span class="row-name">翻页卡排布</span>
+        <span class="row-name">{{ t("time.digitLayout") }}</span>
         <div class="segmented stretch">
           <button
             type="button"
             :class="{ selected: settings.appearance.digitLayout === 'per-digit' }"
             @click="setLayout('per-digit')"
           >
-            一位一卡
+            {{ t("time.layoutPerDigit") }}
           </button>
           <button
             type="button"
             :class="{ selected: settings.appearance.digitLayout === 'per-pair' }"
             @click="setLayout('per-pair')"
           >
-            两位一卡
+            {{ t("time.layoutPerPair") }}
           </button>
         </div>
       </div>
 
       <div class="scale-block">
         <div class="scale-head">
-          <span class="row-name">时钟缩放</span>
+          <span class="row-name">{{ t("clock.scale") }}</span>
           <span class="scale-value">{{ scalePercent }}%</span>
         </div>
         <input
@@ -144,7 +145,7 @@ function setLayout(layout: DigitLayout) {
           :min="SCALE_MIN"
           :max="SCALE_MAX"
           :step="SCALE_STEP"
-          aria-label="时钟缩放比例"
+          :aria-label="t('clock.scaleAria')"
         />
       </div>
 

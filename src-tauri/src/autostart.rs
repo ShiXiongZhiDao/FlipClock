@@ -14,6 +14,8 @@ use windows::Win32::System::Registry::{
     HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_BINARY, REG_SZ,
 };
 
+use crate::errors::AppError;
+
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const APPROVED_KEY: &str =
     r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
@@ -40,7 +42,11 @@ fn open(path: &str, write: bool) -> Result<HKEY, String> {
     if code == ERROR_SUCCESS {
         Ok(key)
     } else {
-        Err(format!("打开注册表键失败（{}）：{code:?}", code.0))
+        Err(AppError::AutostartKeyFailed {
+            key: path.to_string(),
+            detail: format!("{code:?}"),
+        }
+        .into())
     }
 }
 
@@ -84,7 +90,9 @@ fn read(path: &str, name: &str) -> Option<Vec<u8>> {
 
 /// 注册表里存的命令行：带引号的绝对路径 + `--tray`（自启只驻留托盘）。
 pub fn command_line() -> Result<String, String> {
-    let exe = std::env::current_exe().map_err(|e| format!("取程序路径失败：{e}"))?;
+    let exe = std::env::current_exe().map_err(|e| AppError::AutostartExeFailed {
+        detail: e.to_string(),
+    })?;
     Ok(format!("\"{}\" {TRAY_FLAG}", exe.display()))
 }
 
@@ -120,7 +128,11 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
         let _ = RegCloseKey(key);
     }
     if code != ERROR_SUCCESS && code != ERROR_FILE_NOT_FOUND {
-        return Err(format!("写入启动项失败（{}）：{code:?}", code.0));
+        return Err(AppError::AutostartWriteFailed {
+            key: VALUE_NAME.to_string(),
+            detail: format!("{code:?}"),
+        }
+        .into());
     }
 
     if enabled {

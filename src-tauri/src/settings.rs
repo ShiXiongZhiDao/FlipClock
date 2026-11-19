@@ -44,6 +44,36 @@ pub fn clamp_sound_volume(value: f32) -> f32 {
     value.clamp(SOUND_VOLUME_MIN, SOUND_VOLUME_MAX)
 }
 
+/// 界面语言偏好。system 只在启动时由前端归并为 zh/en，Rust 侧不参与判定。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LanguagePreference {
+    System,
+    Zh,
+    En,
+}
+
+impl Default for LanguagePreference {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiSettings {
+    #[serde(default)]
+    pub language: LanguagePreference,
+}
+
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            language: LanguagePreference::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -62,6 +92,8 @@ pub struct Settings {
     #[serde(default)]
     pub system: SystemSettings,
     #[serde(default)]
+    pub ui: UiSettings,
+    #[serde(default)]
     pub registration: Registration,
 }
 
@@ -75,6 +107,7 @@ impl Default for Settings {
             screensaver: ScreenSaverSettings::default(),
             launch: LaunchSettings::default(),
             system: SystemSettings::default(),
+            ui: UiSettings::default(),
             registration: Registration::default(),
         }
     }
@@ -390,6 +423,9 @@ pub fn load(app: &AppHandle) -> Settings {
     settings.sound.volume = clamp_sound_volume(settings.sound.volume);
     settings.screensaver = section(&value, "screensaver").unwrap_or_default();
     settings.launch = section(&value, "launch").unwrap_or_default();
+    // 这一段曾经漏过 system，造成「保存成功、重启回默认」。新段必须显式加载，
+    // 哪怕默认值就是想要的——漏了就是静默失败。
+    settings.ui = section(&value, "ui").unwrap_or_default();
     settings.registration = section(&value, "registration").unwrap_or_default();
     settings.schema_version = SCHEMA_VERSION;
     settings
@@ -413,15 +449,27 @@ fn backup_corrupt(path: &PathBuf) {
 
 /// 原子写入：先写临时文件，再替换目标。
 pub fn save(app: &AppHandle, settings: &Settings) -> Result<(), String> {
-    let path = config_path(app).ok_or("无法定位配置目录")?;
+    use crate::errors::AppError;
+
+    let path = config_path(app).ok_or(String::from(AppError::ConfigDirUnavailable))?;
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败：{e}"))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::CreateConfigDirFailed {
+            detail: e.to_string(),
+        })?;
     }
-    let json = serde_json::to_string_pretty(settings).map_err(|e| format!("序列化配置失败：{e}"))?;
+    let json = serde_json::to_string_pretty(settings).map_err(|e| {
+        AppError::SerializeConfigFailed {
+            detail: e.to_string(),
+        }
+    })?;
 
     let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, json).map_err(|e| format!("写入临时配置失败：{e}"))?;
-    fs::rename(&tmp, &path).map_err(|e| format!("替换配置失败：{e}"))?;
+    fs::write(&tmp, json).map_err(|e| AppError::WriteConfigFailed {
+        detail: e.to_string(),
+    })?;
+    fs::rename(&tmp, &path).map_err(|e| AppError::ReplaceConfigFailed {
+        detail: e.to_string(),
+    })?;
     Ok(())
 }
 
@@ -447,6 +495,24 @@ mod tests {
         assert_eq!(s.screensaver.monitor_mode, MonitorMode::Primary);
         assert_eq!(s.launch.no_arg_mode, NoArgMode::Settings);
         assert!(s.system.close_to_tray);
+        assert_eq!(s.ui.language, LanguagePreference::System);
+    }
+
+    #[test]
+    fn ui_language_is_loaded_by_the_top_level_loader() {
+        // 回归测试：system 段曾因 load() 漏掉而「保存后再读回默认」。
+        // 这里直接调 load() 的逐段逻辑，钉住 ui 段不会被同样漏掉。
+        let raw = serde_json::json!({
+            "schemaVersion": 1,
+            "ui": { "language": "en" }
+        });
+        let mut settings = Settings::default();
+        settings.ui = section(&raw, "ui").unwrap_or_default();
+        assert_eq!(settings.ui.language, LanguagePreference::En);
+
+        let raw = serde_json::json!({ "schemaVersion": 1 });
+        let settings: Settings = serde_json::from_value(raw).expect("缺 ui 段应能反序列化");
+        assert_eq!(settings.ui.language, LanguagePreference::System);
     }
 
     #[test]

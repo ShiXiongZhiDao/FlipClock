@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::errors::AppError;
 use crate::platform;
 use crate::screensaver::AppState;
 use crate::settings;
@@ -33,12 +34,17 @@ pub struct ScreenSaverStatus {
 pub fn target_path() -> Result<PathBuf, String> {
     let base = std::env::var("LOCALAPPDATA")
         .map(PathBuf::from)
-        .map_err(|_| "无法定位 LOCALAPPDATA".to_string())?;
+        .map_err(|_| String::from(AppError::NoLocalAppData))?;
     Ok(base.join("FlipClock").join("FlipClock.scr"))
 }
 
 fn current_exe() -> Result<PathBuf, String> {
-    std::env::current_exe().map_err(|e| format!("无法定位当前程序：{e}"))
+    std::env::current_exe().map_err(|e| {
+        AppError::CurrentExeFailed {
+            detail: e.to_string(),
+        }
+        .into()
+    })
 }
 
 /// 主程序是不是由安装包装出来的。
@@ -111,10 +117,15 @@ pub fn refresh_if_outdated() -> Result<bool, String> {
 /// 同卷改名是原子的，最坏情况是旧版本继续留着，而不是一个跑不起来的屏保。
 fn replace_component(source: &PathBuf, target: &PathBuf) -> Result<(), String> {
     let temp = target.with_extension("scr.new");
-    fs::copy(source, &temp).map_err(|e| format!("写入屏保组件失败：{e}"))?;
+    fs::copy(source, &temp).map_err(|e| AppError::CopySaverFailed {
+        detail: e.to_string(),
+    })?;
     if let Err(error) = fs::rename(&temp, target) {
         let _ = fs::remove_file(&temp);
-        return Err(format!("替换屏保组件失败：{error}"));
+        return Err(AppError::ReplaceSaverFailed {
+            detail: error.to_string(),
+        }
+        .into());
     }
     Ok(())
 }
@@ -189,7 +200,9 @@ pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
 pub fn install(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
     let target = target_path()?;
     if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建安装目录失败：{e}"))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::CreateInstallDirFailed {
+            detail: e.to_string(),
+        })?;
     }
 
     let source = current_exe()?;
@@ -206,7 +219,7 @@ pub fn install(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
         let mut guard = state
             .settings
             .lock()
-            .map_err(|_| "配置状态不可用".to_string())?;
+            .map_err(|_| String::from(AppError::ConfigUnavailable))?;
 
         // 只有当当前指向不是我们自己时，才更新回滚点，避免把回滚点覆盖成自己。
         let already_ours = previous
@@ -233,7 +246,7 @@ pub fn restore(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
         let guard = state
             .settings
             .lock()
-            .map_err(|_| "配置状态不可用".to_string())?;
+            .map_err(|_| String::from(AppError::ConfigUnavailable))?;
         (
             guard.registration.rollback_scrnsave_exe.clone(),
             guard.registration.rollback_screen_save_active.clone(),
@@ -271,7 +284,7 @@ pub fn restore(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
         let mut guard = state
             .settings
             .lock()
-            .map_err(|_| "配置状态不可用".to_string())?;
+            .map_err(|_| String::from(AppError::ConfigUnavailable))?;
         guard.registration.rollback_scrnsave_exe = None;
         guard.registration.rollback_screen_save_active = None;
         guard.registration.installed_path = None;
@@ -286,5 +299,8 @@ pub fn open_windows_settings() -> Result<(), String> {
         .args(["shell32.dll,Control_RunDLL", "desk.cpl,,@screensaver"])
         .spawn()
         .map(|_| ())
-        .map_err(|e| format!("打开系统屏保设置失败：{e}"))
+        .map_err(|e| AppError::OpenWindowsSettingsFailed {
+            detail: e.to_string(),
+        }
+        .into())
 }

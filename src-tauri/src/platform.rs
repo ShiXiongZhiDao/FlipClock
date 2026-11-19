@@ -13,6 +13,8 @@ mod imp {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetLastInputInfo, LASTINPUTINFO};
     use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, IsWindow};
 
+    use crate::errors::AppError;
+
     const DESKTOP_KEY: &str = r"Control Panel\Desktop";
 
     /// 用窗口区域把方角裁成圆角。
@@ -32,7 +34,9 @@ mod imp {
     ) -> Result<(), String> {
         let hwnd = window
             .hwnd()
-            .map_err(|e| format!("读取窗口句柄失败：{e}"))?;
+            .map_err(|e| AppError::ReadWindowHandleFailed {
+                detail: e.to_string(),
+            })?;
 
         // SetWindowRgn 的单位是物理像素；CreateRoundRectRgn 的后两个参数是
         // 椭圆直径，所以传 2r。+1 是为了不让最右/最下一列像素被排除在外。
@@ -47,12 +51,12 @@ mod imp {
                 r * 2,
             );
             if region.is_invalid() {
-                return Err("创建窗口圆角区域失败".into());
+                return Err(String::from(AppError::RoundRegionCreateFailed));
             }
             // 成功时区域归系统所有，不能再自己释放；失败时才需要释放。
             if SetWindowRgn(hwnd, Some(region), true) == 0 {
                 let _ = DeleteObject(region.into());
-                return Err("应用窗口圆角区域失败".into());
+                return Err(String::from(AppError::RoundRegionApplyFailed));
             }
         }
         Ok(())
@@ -158,7 +162,9 @@ mod imp {
                 &mut key,
             )
             .ok()
-            .map_err(|e| format!("打开注册表键失败：{e}"))?;
+            .map_err(|e| AppError::OpenRegistryFailed {
+                detail: e.to_string(),
+            })?;
 
             let name = HSTRING::from(name);
             let mut data: Vec<u16> = value.encode_utf16().collect();
@@ -167,7 +173,11 @@ mod imp {
 
             let status = RegSetValueExW(key, &name, None, REG_SZ, Some(&bytes));
             let _ = RegCloseKey(key);
-            status.ok().map_err(|e| format!("写入注册表失败：{e}"))
+            status.ok().map_err(|e| {
+                String::from(AppError::WriteRegistryFailed {
+                    detail: e.to_string(),
+                })
+            })
         }
     }
 
@@ -183,11 +193,17 @@ mod imp {
                 &mut key,
             )
             .ok()
-            .map_err(|e| format!("打开注册表键失败：{e}"))?;
+            .map_err(|e| AppError::OpenRegistryFailed {
+                detail: e.to_string(),
+            })?;
 
             let status = RegDeleteValueW(key, &HSTRING::from(name));
             let _ = RegCloseKey(key);
-            status.ok().map_err(|e| format!("删除注册表值失败：{e}"))
+            status.ok().map_err(|e| {
+                String::from(AppError::DeleteRegistryValueFailed {
+                    detail: e.to_string(),
+                })
+            })
         }
     }
 }
@@ -195,6 +211,8 @@ mod imp {
 #[cfg(not(windows))]
 mod imp {
     use tauri::WebviewWindow;
+
+    use crate::errors::AppError;
 
     pub fn set_round_window_region(
         _window: &WebviewWindow,
@@ -225,10 +243,10 @@ mod imp {
         None
     }
     pub fn write_desktop_string(_name: &str, _value: &str) -> Result<(), String> {
-        Err("当前平台不支持屏保注册".into())
+        Err(String::from(AppError::SaverRegistrationUnsupported))
     }
     pub fn delete_desktop_value(_name: &str) -> Result<(), String> {
-        Err("当前平台不支持屏保注册".into())
+        Err(String::from(AppError::SaverRegistrationUnsupported))
     }
 }
 

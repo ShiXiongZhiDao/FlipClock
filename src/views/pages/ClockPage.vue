@@ -3,6 +3,7 @@ import FlipClock from "../../components/clock/FlipClock.vue";
 import { useClock } from "../../composables/useClock";
 import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
+import { t } from "../../lib/i18n";
 import { THEME_LABELS, type Theme, type TimeFormat } from "../../types/settings";
 
 const { now } = useClock();
@@ -24,7 +25,7 @@ function setTheme(theme: Theme) {
   <div class="workspace">
     <section class="preview-card">
       <div class="card-head">
-        <strong>实时效果</strong>
+        <strong>{{ t("preview.live") }}</strong>
       </div>
 
       <div class="stage">
@@ -45,11 +46,11 @@ function setTheme(theme: Theme) {
     </section>
 
     <aside class="card settings-card">
-      <div class="card-title">快速设置</div>
+      <div class="card-title">{{ t("preview.quickSettings") }}</div>
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">时间制式</span>
+          <span class="row-name">{{ t("time.format") }}</span>
         </div>
         <div class="segmented">
           <button
@@ -71,7 +72,7 @@ function setTheme(theme: Theme) {
 
       <div class="scale-block">
         <div class="scale-head">
-          <span class="row-name">时钟缩放</span>
+          <span class="row-name">{{ t("clock.scale") }}</span>
           <span class="scale-value">{{ scalePercent }}%</span>
         </div>
         <input
@@ -81,13 +82,13 @@ function setTheme(theme: Theme) {
           :min="SCALE_MIN"
           :max="SCALE_MAX"
           :step="SCALE_STEP"
-          aria-label="时钟缩放比例"
+          :aria-label="t('clock.scaleAria')"
         />
       </div>
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示日期与星期</span>
+          <span class="row-name">{{ t("time.showDate") }}</span>
         </div>
         <button
           type="button"
@@ -103,7 +104,7 @@ function setTheme(theme: Theme) {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示秒数</span>
+          <span class="row-name">{{ t("time.showSeconds") }}</span>
         </div>
         <button
           type="button"
@@ -121,7 +122,7 @@ function setTheme(theme: Theme) {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">显示主题</span>
+          <span class="row-name">{{ t("appearance.showTheme") }}</span>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ function setTheme(theme: Theme) {
             <span class="theme-card"><span>1</span></span>
             <span class="theme-card"><span>2</span></span>
           </span>
-          <small>{{ THEME_LABELS[theme] }}</small>
+          <small>{{ t(THEME_LABELS[theme]) }}</small>
         </button>
       </div>
     </aside>

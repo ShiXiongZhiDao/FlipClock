@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { useSettings } from "../../composables/useSettings";
 import { isTauri } from "../../lib/env";
+import { errorText, t, type MessageKey } from "../../lib/i18n";
 import { useUpdater } from "../../lib/updater";
 import type { ScreenSaverStatus } from "../../types/settings";
 
@@ -36,7 +37,7 @@ async function openAboutLink(key: string) {
   try {
     await invoke("open_about_link", { key });
   } catch (error) {
-    notify("err", String(error));
+    notify("err", errorText(error));
   }
 }
 
@@ -65,6 +66,13 @@ function wireQrImages() {
 }
 
 const { settings } = useSettings();
+
+/** 三个语言选项。跟随系统的实际语言由 i18n 在启动时算，不在 UI 上展开地区变体。 */
+const LANGUAGE_OPTIONS: { value: "system" | "zh" | "en"; label: MessageKey }[] = [
+  { value: "system", label: "language.system" },
+  { value: "zh", label: "language.zh" },
+  { value: "en", label: "language.en" },
+];
 
 /** 自启状态不来自配置文件，而是每次读注册表——任务管理器里禁用也要能反映出来。 */
 const autostart = ref(false);
@@ -101,10 +109,10 @@ async function toggleAutostart() {
   try {
     await invoke("set_autostart", { enabled: next });
     autostart.value = next;
-    notify("ok", next ? "已加入开机启动" : "已从开机启动移除");
+    notify("ok", t(next ? "system.autostartOn" : "system.autostartOff"));
   } catch (error) {
     // 写注册表失败（组策略、权限）时要让用户看见原因，开关保持原状。
-    notify("err", String(error));
+    notify("err", errorText(error));
     await refreshAutostart();
   } finally {
     busy.value = false;
@@ -112,15 +120,19 @@ async function toggleAutostart() {
 }
 
 /** 术语表里的四种注册状态一个都不能少：二分成「已装/未装」会把过期说成没装。 */
-const SAVER_LABEL: Record<string, string> = {
-  notInstalled: "未安装",
-  installed: "已安装",
-  missing: "文件缺失",
-  outdated: "版本不匹配",
+const SAVER_LABEL: Record<string, MessageKey> = {
+  notInstalled: "saver.status.notInstalled",
+  installed: "saver.status.installed",
+  missing: "saver.status.missing",
+  outdated: "saver.status.outdated",
 };
 
 const saverLabel = computed(() =>
-  saver.value ? (SAVER_LABEL[saver.value.state] ?? saver.value.state) : "—",
+  saver.value
+    ? SAVER_LABEL[saver.value.state]
+      ? t(SAVER_LABEL[saver.value.state])
+      : saver.value.state
+    : "—",
 );
 const saverNeedsInstall = computed(
   () => saver.value?.state === "outdated" || saver.value?.state === "missing",
@@ -131,9 +143,9 @@ async function reinstallSaver() {
   busy.value = true;
   try {
     saver.value = await invoke<ScreenSaverStatus>("install_screensaver");
-    notify("ok", "屏保组件已更新为当前版本");
+    notify("ok", t("system.saverUpdatedToast"));
   } catch (error) {
-    notify("err", String(error));
+    notify("err", errorText(error));
   } finally {
     busy.value = false;
   }
@@ -146,19 +158,19 @@ const updateBusy = computed(() =>
 const updateTitle = computed(() => {
   switch (updateState.value.status) {
     case "checking":
-      return "正在检查更新…";
+      return t("system.update.checking");
     case "upToDate":
-      return "已是最新版本";
+      return t("system.update.upToDate");
     case "available":
-      return `有新版本 v${updateState.value.version}`;
+      return t("system.update.available", { version: updateState.value.version });
     case "downloading":
-      return `正在下载 ${updateState.value.percent}%`;
+      return t("system.update.downloading", { percent: updateState.value.percent });
     case "installing":
-      return "正在安装，应用会退出并重新启动";
+      return t("system.update.installing");
     case "error":
-      return "检查更新失败";
+      return t("system.update.failed");
     default:
-      return "更新";
+      return t("system.update.title");
   }
 });
 
@@ -166,14 +178,14 @@ const updateHint = computed(() => {
   switch (updateState.value.status) {
     case "available":
       return installedBuild.value === false
-        ? "当前是便携版：自动安装只能替换安装版，请到 Release 页下载新包。"
-        : "下载完成后应用会短暂退出，由安装器替换文件。";
+        ? t("system.update.portableHint")
+        : t("system.update.downloadHint");
     case "installing":
-      return "安装器接管后会自动把 FlipClock 拉起来。";
+      return t("system.update.installerHint");
     case "error":
       return updateState.value.message;
     case "idle":
-      return installedBuild.value === false ? "便携版可以检查，但不能就地安装。" : "";
+      return installedBuild.value === false ? t("system.update.portableIdle") : "";
     default:
       return "";
   }
@@ -209,12 +221,29 @@ onBeforeUnmount(() => {
 <template>
   <div class="system-page">
     <section class="card">
-      <div class="card-title">启动</div>
+      <div class="card-title">{{ t("language.title") }}</div>
+      <div class="language-options">
+        <button
+          v-for="option in LANGUAGE_OPTIONS"
+          :key="option.value"
+          type="button"
+          class="language-option"
+          :class="{ selected: settings.ui.language === option.value }"
+          @click="settings.ui.language = option.value"
+        >
+          {{ t(option.label) }}
+        </button>
+      </div>
+      <p class="row-hint language-hint">{{ t("language.hint") }}</p>
+    </section>
+
+    <section class="card">
+      <div class="card-title">{{ t("common.startup") }}</div>
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">开机自启</span>
-          <span class="row-hint">登录 Windows 后驻留托盘，不弹窗口</span>
+          <span class="row-name">{{ t("system.autostart") }}</span>
+          <span class="row-hint">{{ t("system.autostartHint") }}</span>
         </div>
         <button
           type="button"
@@ -233,8 +262,8 @@ onBeforeUnmount(() => {
 
       <div class="row">
         <div class="row-copy">
-          <span class="row-name">关闭窗口时最小化到托盘</span>
-          <span class="row-hint">关掉后点关闭按钮就退出整个程序</span>
+          <span class="row-name">{{ t("system.closeToTray") }}</span>
+          <span class="row-hint">{{ t("system.closeToTrayHint") }}</span>
         </div>
         <button
           type="button"
@@ -254,13 +283,13 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="card">
-      <div class="card-title">关于</div>
+      <div class="card-title">{{ t("system.about") }}</div>
       <div class="info-row">
-        <span>版本</span>
+        <span>{{ t("system.version") }}</span>
         <strong>{{ version || "—" }}</strong>
       </div>
       <div class="info-row">
-        <span>屏保组件</span>
+        <span>{{ t("system.saverComponent") }}</span>
         <span class="info-state">
           <strong :class="{ warn: saverNeedsInstall }">{{ saverLabel }}</strong>
           <button
@@ -270,7 +299,7 @@ onBeforeUnmount(() => {
             :disabled="busy"
             @click="reinstallSaver"
           >
-            重新安装
+            {{ t("system.reinstall") }}
           </button>
         </span>
       </div>
@@ -298,7 +327,7 @@ onBeforeUnmount(() => {
           :disabled="updateBusy"
           @click="checkForUpdate({})"
         >
-          {{ updateState.status === "error" ? "重试" : "检查更新" }}
+          {{ t(updateState.status === "error" ? "system.update.retry" : "system.update.check") }}
         </button>
         <button
           v-else-if="updateAction === 'install'"
@@ -307,7 +336,7 @@ onBeforeUnmount(() => {
           :disabled="updateBusy"
           @click="installUpdate"
         >
-          下载并安装
+          {{ t("system.update.downloadInstall") }}
         </button>
       </div>
     </section>
@@ -315,43 +344,40 @@ onBeforeUnmount(() => {
     <!-- 关于作者、公众号与赞助：图片一律走远端仓库，不占安装包体积。 -->
     <div id="about-cards" class="about-cards">
       <section class="card">
-        <div class="card-title">关于作者</div>
-        <p class="about-text">
-          FlipClock 由「师兄知道」制作。个人主页、源码与反馈入口都在下面，公众号与收款码
-          从公开图片仓库实时加载，不随安装包分发。
-        </p>
+        <div class="card-title">{{ t("system.aboutAuthor") }}</div>
+        <p class="about-text">{{ t("system.aboutText") }}</p>
         <div class="about-links">
           <button type="button" class="ghost-button" @click="openAboutLink('website')">
-            官网
+            {{ t("system.officialWebsite") }}
           </button>
           <button type="button" class="ghost-button" @click="openAboutLink('projects')">
-            开源项目
+            {{ t("system.openSource") }}
           </button>
           <button type="button" class="ghost-button" @click="openAboutLink('issues')">
-            问题反馈
+            {{ t("system.feedback") }}
           </button>
         </div>
       </section>
 
       <section class="card">
-        <div class="card-title">关注公众号</div>
+        <div class="card-title">{{ t("system.followWechat") }}</div>
         <div class="qr-slot qr-banner">
-          <img data-qr="wechat-official.png" alt="微信公众号「师兄知道」二维码" referrerpolicy="no-referrer" />
-          <p class="qr-fail">图片源暂时连不上，可在微信里直接搜「师兄知道」。</p>
+          <img data-qr="wechat-official.png" :alt="t('system.wechatQrAlt')" referrerpolicy="no-referrer" />
+          <p class="qr-fail">{{ t("system.wechatQrFail") }}</p>
         </div>
       </section>
 
       <section class="card">
-        <div class="card-title">赞助作者</div>
-        <p class="about-text">喜欢的话可以请作者喝杯咖啡，不影响功能。</p>
+        <div class="card-title">{{ t("system.sponsor") }}</div>
+        <p class="about-text">{{ t("system.sponsorText") }}</p>
         <div class="qr-row">
           <div class="qr-slot qr-tile">
-            <img data-qr="alipay.png" alt="支付宝收款码" referrerpolicy="no-referrer" />
-            <p class="qr-fail">支付宝收款码暂时加载不出来。</p>
+            <img data-qr="alipay.png" :alt="t('system.alipayQrAlt')" referrerpolicy="no-referrer" />
+            <p class="qr-fail">{{ t("system.alipayQrFail") }}</p>
           </div>
           <div class="qr-slot qr-tile">
-            <img data-qr="wechat-pay.png" alt="微信支付收款码" referrerpolicy="no-referrer" />
-            <p class="qr-fail">微信收款码暂时加载不出来。</p>
+            <img data-qr="wechat-pay.png" :alt="t('system.wechatPayQrAlt')" referrerpolicy="no-referrer" />
+            <p class="qr-fail">{{ t("system.wechatPayQrFail") }}</p>
           </div>
         </div>
       </section>
@@ -380,6 +406,37 @@ onBeforeUnmount(() => {
 .row-hint {
   font-size: 10px;
   color: var(--ui-text-muted);
+}
+
+.language-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.language-option {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-divider);
+  border-radius: 9px;
+  background: var(--ui-bg);
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.language-option:hover {
+  border-color: var(--ui-accent-line);
+}
+
+.language-option.selected {
+  border-color: var(--ui-accent-line-strong);
+  box-shadow: 0 0 0 1px var(--ui-accent-halo);
+  color: var(--ui-text);
+}
+
+.language-hint {
+  margin: 8px 0 0;
 }
 
 .info-row {
