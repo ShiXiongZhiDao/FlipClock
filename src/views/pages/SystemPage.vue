@@ -17,8 +17,28 @@ const QR_MIRRORS = [
   "https://raw.githubusercontent.com/ShiXiongZhiDao/BrandAssets/main/images/about/",
   "https://gitee.com/ShiXiongZhiDao/BrandAssets/raw/main/images/about/",
 ];
-const WEBSITE_URL = "https://shixiongzhidao.cn";
-const ISSUES_URL = "https://github.com/ShiXiongZhiDao/FlipClock/issues";
+/**
+ * 关于页的外链只传 key：白名单在后端，前端拼不出任意 URL。
+ * 浏览器里预览版式时没有 Tauri 命令，退回 window.open 方便调试。
+ */
+const ABOUT_LINK_FALLBACK: Record<string, string> = {
+  website: "https://shixiongzhidao.cn",
+  issues: "https://github.com/ShiXiongZhiDao/FlipClock/issues",
+  projects: "https://github.com/ShiXiongZhiDao",
+  screensaver: "https://github.com/ShiXiongZhiDao/FlipClock",
+};
+
+async function openAboutLink(key: string) {
+  if (!isTauri()) {
+    window.open(ABOUT_LINK_FALLBACK[key], "_blank", "noopener,noreferrer");
+    return;
+  }
+  try {
+    await invoke("open_about_link", { key });
+  } catch (error) {
+    notify("err", String(error));
+  }
+}
 
 /**
  * 顺序回退：GitHub 不通换 Gitee，都试过就藏图露字。
@@ -301,12 +321,15 @@ onBeforeUnmount(() => {
           从公开图片仓库实时加载，不随安装包分发。
         </p>
         <div class="about-links">
-          <a class="ghost-button" :href="WEBSITE_URL" target="_blank" rel="noopener noreferrer">
+          <button type="button" class="ghost-button" @click="openAboutLink('website')">
             官网
-          </a>
-          <a class="ghost-button" :href="ISSUES_URL" target="_blank" rel="noopener noreferrer">
+          </button>
+          <button type="button" class="ghost-button" @click="openAboutLink('projects')">
+            开源项目
+          </button>
+          <button type="button" class="ghost-button" @click="openAboutLink('issues')">
             问题反馈
-          </a>
+          </button>
         </div>
       </section>
 
@@ -493,7 +516,6 @@ onBeforeUnmount(() => {
 .about-links .ghost-button {
   display: inline-flex;
   align-items: center;
-  text-decoration: none;
 }
 
 .qr-row {

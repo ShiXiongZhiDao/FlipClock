@@ -122,6 +122,36 @@ pub fn open_windows_screensaver_settings() -> Result<(), String> {
     install::open_windows_settings()
 }
 
+/// 关于页的外链。前端只传 key，URL 固定在这里：不把 URL 交给前端拼，
+/// 否则一次 XSS 就能拿它当任意程序启动器。
+const ABOUT_LINKS: &[(&str, &str)] = &[
+    ("website", "https://shixiongzhidao.cn"),
+    ("issues", "https://github.com/ShiXiongZhiDao/FlipClock/issues"),
+    ("projects", "https://github.com/ShiXiongZhiDao"),
+    ("screensaver", "https://github.com/ShiXiongZhiDao/FlipClock"),
+];
+
+/// 只做查表、不启动进程，便于测试白名单本身。
+fn about_link_url(key: &str) -> Result<&'static str, String> {
+    ABOUT_LINKS
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, url)| *url)
+        .ok_or_else(|| format!("未知的外链标识：{key}"))
+}
+
+#[tauri::command]
+pub fn open_about_link(key: String) -> Result<(), String> {
+    // WebView 里的 target="_blank" 不会打开系统浏览器，必须走系统 shell。
+    let url = about_link_url(&key)?;
+
+    std::process::Command::new("cmd")
+        .args(["/c", "start", "", url])
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开浏览器失败：{e}"))
+}
+
 /// 从全屏时钟回到设置窗口。先开设置窗口再关全屏窗口，
 /// 否则关掉唯一窗口会直接结束进程。
 #[tauri::command]
@@ -169,5 +199,20 @@ mod tests {
         assert_eq!(patch.appearance.font, crate::settings::DigitFont::Bahnschrift);
         assert!(patch.time.show_colon);
         assert!(!patch.system.close_to_tray);
+    }
+
+    #[test]
+    fn about_links_only_open_known_destinations() {
+        assert_eq!(
+            super::about_link_url("website").unwrap(),
+            "https://shixiongzhidao.cn"
+        );
+        assert!(super::about_link_url("projects")
+            .unwrap()
+            .contains("ShiXiongZhiDao"));
+        assert!(super::about_link_url("issues").unwrap().ends_with("/issues"));
+        // 前端传来的任意 URL 不能越过白名单。
+        assert!(super::about_link_url("https://evil.example").is_err());
+        assert!(super::about_link_url("").is_err());
     }
 }

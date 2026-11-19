@@ -134,6 +134,7 @@ pub fn run() {
             commands::install_screensaver,
             commands::restore_screensaver,
             commands::open_windows_screensaver_settings,
+            commands::open_about_link,
             commands::leave_fullscreen_clock,
             commands::autostart_status,
             commands::set_autostart,

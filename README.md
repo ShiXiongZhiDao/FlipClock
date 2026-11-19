@@ -152,6 +152,7 @@ live on that. The QR codes below are loaded from a public image repository, not 
 ## 📮 Contact
 
 - Website: [shixiongzhidao.cn](https://shixiongzhidao.cn)
+- Open-source projects: [github.com/ShiXiongZhiDao](https://github.com/ShiXiongZhiDao)
 - Issues: [GitHub Issues](https://github.com/ShiXiongZhiDao/FlipClock/issues)
 - WeChat channel: **师兄知道** — the same one shown in the app's *System → About* screen.
 

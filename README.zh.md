@@ -152,6 +152,7 @@ GNU GPL v3.0，见 [LICENSE](./LICENSE)。随包的 Bebas Neue 字体按 SIL Ope
 ## 📮 联系
 
 - 个人主页：[shixiongzhidao.cn](https://shixiongzhidao.cn)
+- 开源项目：[github.com/ShiXiongZhiDao](https://github.com/ShiXiongZhiDao)
 - 问题反馈：[GitHub Issues](https://github.com/ShiXiongZhiDao/FlipClock/issues)
 - 微信公众号：**师兄知道**——软件里「系统 → 关于作者」展示的是同一个。
 
