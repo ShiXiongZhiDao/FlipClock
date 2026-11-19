@@ -1,23 +1,15 @@
 <script setup lang="ts">
-import { computed } from "vue";
-
 import FlipClock from "../../components/clock/FlipClock.vue";
 import { useClock } from "../../composables/useClock";
+import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
-import {
-  CLOCK_FIT_SCALE,
-  THEME_LABELS,
-  type Theme,
-  type TimeFormat,
-} from "../../types/settings";
+import { THEME_LABELS, type Theme, type TimeFormat } from "../../types/settings";
 
 const { now } = useClock();
 const { settings } = useSettings();
+const { scalePercent, previewScale, SCALE_MIN, SCALE_MAX, SCALE_STEP } = useClockScale();
 
 const THEMES: Theme[] = ["classic-dark", "oled-black", "retro-light"];
-
-/** 与「时间与日期」页同一套标定：100% 只是容器自适应，缩放滑杆要在这里看得出来。 */
-const previewScale = computed(() => settings.appearance.clockScale / CLOCK_FIT_SCALE);
 
 function setFormat(format: TimeFormat) {
   settings.time.format = format;
@@ -75,6 +67,22 @@ function setTheme(theme: Theme) {
             12H
           </button>
         </div>
+      </div>
+
+      <div class="scale-block">
+        <div class="scale-head">
+          <span class="row-name">时钟缩放</span>
+          <span class="scale-value">{{ scalePercent }}%</span>
+        </div>
+        <input
+          v-model.number="scalePercent"
+          class="range"
+          type="range"
+          :min="SCALE_MIN"
+          :max="SCALE_MAX"
+          :step="SCALE_STEP"
+          aria-label="时钟缩放比例"
+        />
       </div>
 
       <div class="row">
@@ -244,5 +252,32 @@ function setTheme(theme: Theme) {
   font-size: 15px;
   line-height: 1;
   color: var(--digit);
+}
+
+.scale-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scale-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scale-value {
+  font-size: 10px;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.range {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ui-accent);
+  cursor: default;
 }
 </style>

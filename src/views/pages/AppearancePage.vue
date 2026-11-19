@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import FlipClock from "../../components/clock/FlipClock.vue";
+import { useClock } from "../../composables/useClock";
 import { useSettings } from "../../composables/useSettings";
 import {
   BRIGHTNESS_MAX,
@@ -15,12 +16,11 @@ import {
 } from "../../types/settings";
 
 const { settings } = useSettings();
+/** 三行主题预览共用同一个实时时刻：既走时，又保持配色可比。 */
+const { now } = useClock();
 
 const THEMES: Theme[] = ["classic-dark", "oled-black", "retro-light"];
 const FONTS: DigitFont[] = ["bebas", "bahnschrift", "system"];
-
-/** 固定样本时刻，三行显示同一个时间，配色差异才可比。 */
-const SAMPLE = new Date(2026, 10, 18, 9, 41, 0);
 
 const GLASS_MIN = Math.round(GLASS_TRANSPARENCY_MIN * 100);
 const GLASS_MAX = Math.round(GLASS_TRANSPARENCY_MAX * 100);
@@ -57,7 +57,7 @@ const transparency = computed({
       >
         <div class="theme-stage" :data-clock-theme="theme">
           <FlipClock
-            :now="SAMPLE"
+            :now="now"
             format="24h"
             :show-date="false"
             :show-seconds="false"

@@ -83,7 +83,6 @@ const PAGES: PageDef[] = [
 ];
 
 const page = ref<PageId>("clock");
-const current = computed(() => PAGES.find((item) => item.id === page.value) ?? PAGES[0]);
 
 const appWindow = isTauri() ? getCurrentWindow() : null;
 let unlistenClose: (() => void) | undefined;
@@ -120,6 +119,8 @@ async function preview() {
 }
 
 function restoreDefaults() {
+  // 图标按钮没有文字说明，误点代价高：确认一次再清全部设置。
+  if (!window.confirm("恢复默认设置？当前的外观、时间与声音设置会被清除。")) return;
   reset();
   notify("已恢复默认设置");
 }
@@ -168,27 +169,39 @@ onBeforeUnmount(() => {
     <div class="shell-inner">
       <header class="titlebar">
         <div class="titlebar-drag" data-tauri-drag-region></div>
-        <div class="traffic">
+        <div class="product-name">FlipClock</div>
+        <div class="titlebar-actions">
           <button
-            class="light light-zoom"
+            class="icon-action"
             type="button"
-            disabled
-            :title="'窗口尺寸固定，不可缩放'"
-            aria-label="不可缩放"
-          ></button>
+            title="恢复默认设置"
+            aria-label="恢复默认设置"
+            @click="restoreDefaults"
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M13 8a5 5 0 1 1-1.6-3.7" />
+              <path d="M13 2.5V5h-2.5" />
+            </svg>
+          </button>
+          <button
+            class="icon-action"
+            type="button"
+            title="预览屏保"
+            aria-label="预览屏保"
+            @click="preview"
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M2.5 5.5v-3h3M10.5 2.5h3v3M13.5 10.5v3h-3M5.5 13.5h-3v-3" />
+            </svg>
+          </button>
+        </div>
+        <div class="traffic">
           <button class="light light-min" type="button" title="最小化" aria-label="最小化" @click="minimize"></button>
           <button class="light light-close" type="button" title="关闭" aria-label="关闭" @click="closeWindow"></button>
         </div>
       </header>
 
       <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-mark">F</div>
-          <div class="brand-copy">
-            <div class="brand-name">FlipClock</div>
-          </div>
-        </div>
-
         <div class="nav-block">
           <nav class="nav">
             <button
@@ -209,23 +222,15 @@ onBeforeUnmount(() => {
       </aside>
 
       <main class="content">
-        <header class="topbar">
-          <div class="title-block">
-            <h1>{{ current.title }}</h1>
-          </div>
-          <div class="top-actions">
-            <button class="secondary" type="button" @click="restoreDefaults">恢复默认</button>
-            <button class="primary" type="button" @click="preview">⛶ 预览屏保</button>
-          </div>
-        </header>
-
         <div class="page">
-          <ClockPage v-if="page === 'clock'" />
-          <AppearancePage v-else-if="page === 'appearance'" />
-          <TimePage v-else-if="page === 'time'" />
-          <SoundPage v-else-if="page === 'sound'" />
-          <SystemPage v-else-if="page === 'system'" />
-          <ScreenSaverPage v-else />
+          <Transition name="page">
+            <ClockPage v-if="page === 'clock'" key="clock" />
+            <AppearancePage v-else-if="page === 'appearance'" key="appearance" />
+            <TimePage v-else-if="page === 'time'" key="time" />
+            <SoundPage v-else-if="page === 'sound'" key="sound" />
+            <SystemPage v-else-if="page === 'system'" key="system" />
+            <ScreenSaverPage v-else key="screensaver" />
+          </Transition>
         </div>
       </main>
     </div>
@@ -256,7 +261,8 @@ onBeforeUnmount(() => {
   padding: 6px 12px 12px;
 }
 
-/* 自绘标题栏：整条都是拖拽区，三个灯靠右。
+/* 自绘标题栏：左侧产品名称，两颗灯靠右。整条仍是拖拽区，文字垫在
+   拖拽层上面但不拦鼠标，按钮靠 z-index 盖住拖拽层接点击。
    拖拽只走 data-tauri-drag-region（原生 WM_NCLBUTTONDOWN），不要再加
    -webkit-app-region: drag：Chromium 那套拖动循环会和它抢鼠标，实测窗口
    拖动全程不动、松开鼠标才跳到终点。 */
@@ -265,31 +271,73 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 2px;
 }
 
-/* 拖拽层铺满标题栏但垫在交通灯下面；
+/* 拖拽层铺满标题栏但垫在文字和交通灯下面；
    把 data-tauri-drag-region 放在 header 上会连按钮的点击一起吞掉。 */
 .titlebar-drag {
   position: absolute;
   inset: 0;
 }
 
-.traffic {
+.product-name {
   position: relative;
   z-index: 1;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+/* 操作按钮与交通灯同层：必须盖在拖拽层上才收得到点击。
+   margin-left:auto 把它推到右侧，与最外面的两颗灯之间留一段呼吸。 */
+.titlebar-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 14px;
+}
+
+.icon-action {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 23px;
+  padding: 0;
+  border: 1px solid var(--ui-accent-line);
+  border-radius: 7px;
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.icon-action:hover:not(:disabled) {
+  border-color: var(--ui-accent-line-strong);
+  background: var(--ui-surface);
+}
+
+.icon-action svg {
+  display: block;
+  width: 15px;
+  height: 15px;
 }
 
 .traffic {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
 .light {
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
   padding: 0;
   border-radius: 50%;
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
@@ -302,13 +350,6 @@ onBeforeUnmount(() => {
 
 .light-min {
   background: #febc2e;
-}
-
-/* 窗口尺寸固定，最大化这颗按 macOS 的规矩留白并置灰 */
-.light-zoom {
-  background: #28c840;
-  opacity: 0.32;
-  cursor: default;
 }
 
 .light:hover:not(:disabled) {
@@ -324,7 +365,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 26px;
   min-height: 0;
-  padding: 20px 12px;
+  /* 侧栏没有品牌块；顶部留白按原来 brand 到导航的间距留。 */
+  padding: 34px 12px 20px;
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: var(--radius-sidebar);
   background-color: var(--ui-sidebar);
@@ -339,36 +381,6 @@ onBeforeUnmount(() => {
     rgba(255, 255, 255, calc(var(--ui-glass) * 0.808)) 100%
   );
   box-shadow: var(--ui-card-shadow);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 0 6px;
-}
-
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, var(--ui-brand-from), var(--ui-brand-to));
-  color: #161512;
-  font-family: var(--font-digit);
-  font-size: 20px;
-  box-shadow: 0 5px 16px var(--ui-accent-halo);
-}
-
-.brand-copy {
-  line-height: 1.25;
-}
-
-.brand-name {
-  font-size: 16px;
-  font-weight: 750;
-  letter-spacing: 0.01em;
 }
 
 .nav {
@@ -436,32 +448,36 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-.topbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-h1 {
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.top-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: none;
-  padding-top: 4px;
-}
-
 .page {
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative;
+}
+
+/* 交叉淡入淡出：新旧两页同时在场，绝对定位叠在一起才不会把容器撑高。
+   只动透明度——页面里卡片多，位移过渡会晃眼。 */
+.page-enter-active,
+.page-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.18s ease;
+}
+
+.page-enter-active {
+  z-index: 1;
+}
+
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
 }
 
 .toast {

@@ -1,20 +1,13 @@
 <script setup lang="ts">
-import { computed } from "vue";
-
 import FlipClock from "../../components/clock/FlipClock.vue";
 import { useClock } from "../../composables/useClock";
+import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
-import {
-  CLOCK_FIT_SCALE,
-  CLOCK_SCALE_MAX,
-  CLOCK_SCALE_MIN,
-  CLOCK_SCALE_STEP,
-  type DigitLayout,
-  type TimeFormat,
-} from "../../types/settings";
+import type { DigitLayout, TimeFormat } from "../../types/settings";
 
 const { now } = useClock();
 const { settings } = useSettings();
+const { scalePercent, previewScale, SCALE_MIN, SCALE_MAX, SCALE_STEP } = useClockScale();
 
 function setFormat(format: TimeFormat) {
   settings.time.format = format;
@@ -23,24 +16,6 @@ function setFormat(format: TimeFormat) {
 function setLayout(layout: DigitLayout) {
   settings.appearance.digitLayout = layout;
 }
-
-/** 配置里存 0.5–4.5 的比例，界面用百分比整数。 */
-const scalePercent = computed({
-  get: () => Math.round(settings.appearance.clockScale * 100),
-  set: (value: number) => {
-    settings.appearance.clockScale = value / 100;
-  },
-});
-
-const SCALE_MIN = Math.round(CLOCK_SCALE_MIN * 100);
-const SCALE_MAX = Math.round(CLOCK_SCALE_MAX * 100);
-const SCALE_STEP = Math.round(CLOCK_SCALE_STEP * 100);
-
-/**
- * 预览卡按「16:9 屏刚好铺满」的 157% 标定，和真实 stage 的裁切点一致：
- * 拖过 157% 后卡片两侧同样会被裁掉，让用户提前看到放大到屏幕外的效果。
- */
-const previewScale = computed(() => settings.appearance.clockScale / CLOCK_FIT_SCALE);
 </script>
 
 <template>
