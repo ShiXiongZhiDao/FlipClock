@@ -7,24 +7,20 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue" alt="Windows 10/11 x64">
   <img src="https://img.shields.io/badge/languages-zh%20%C2%B7%20en-orange" alt="Chinese and English docs">
   <img src="https://img.shields.io/badge/data-local%20only-green" alt="Local only">
-  <img src="https://img.shields.io/badge/release-v1.0.0-green" alt="v1.0.0">
+  <img src="https://img.shields.io/badge/release-v1.0.1-green" alt="v1.0.1">
 </p>
 
 <p align="center"><img src="./assets/screenshots/clock-per-pair.jpg" alt="FlipClock full-screen clock, two digits per card" width="880"></p>
 
 ## What it does
 
-FlipClock turns a Windows desktop into a mechanical split-flap clock. Each digit sits in a flip card with a centre seam: the upper leaf folds down, the lower leaf flips in, and a short mechanical click is synthesised in real time — there are no audio files to ship.
+FlipClock turns a Windows desktop into a mechanical split-flap clock, with the flip animation and its click generated at runtime — no audio files to ship.
 
-- Three clock themes: Charcoal, OLED Black, and Warm White.
-- Two digit layouts: one digit per card (four tall cards) or two digits per card (two square cards). Both share the same flip timing and sound; only the grouping changes.
-- 24-hour / 12-hour clock. In 12-hour mode the hour is zero-padded (`09`, not `9`) so the two layouts stay symmetrical.
-- Optional date line, seconds, and separator dots (the two small dots between groups, often called a colon).
-- Clock scale 50%–450% (default 225%), clock brightness 20%–100% (dimming only), and three digit fonts: Bebas Neue (bundled), Bahnschrift, and Segoe UI.
-- Primary monitor or all monitors; start with no arguments to open Settings or go straight to the full-screen clock.
-- A system tray icon: left-click opens Settings, right-click gives you Open settings / Fullscreen clock / Autostart / Quit. Closing the Settings window hides it to the tray by default; quitting happens only from the tray menu.
-- Optional autostart (off by default): logs in to the tray without opening a window. A second launch brings the existing window forward instead of starting another background instance.
-- A screensaver component (`.scr`) that is byte-for-byte the same binary as the app, installable for the current user without administrator rights.
+- **Themes** — five built-in themes; six parts such as background, card, and digits with selectable materials and colours, plus custom images. Each theme carries its own clock profile, so switching themes switches the whole clock face.
+- **Clock face** — one or two digits per card, 24/12-hour time, optional date, seconds, and separator dots; adjustable scale, brightness, and digit font.
+- **Editing** — double-click the clock to open full-screen setup: change settings in a drawer while watching the result. Save writes once; Discard rolls everything back.
+- **Window** — two-column Settings with a live preview and five tabs. Interface language and UI appearance (system / light / dark) are selectable; appearance changes only the shell, never the clock face.
+- **Running** — system tray, autostart, primary or all monitors. The same binary is also a registerable `.scr` screen saver, installed per user without administrator rights.
 
 <p align="center"><img src="./assets/screenshots/clock-per-digit-colon.jpg" alt="One-digit-per-card layout with separator dots" width="880"></p>
 
@@ -54,15 +50,15 @@ A split-flap clock is nice to look at, but most desktop versions are either a br
 
 ## Screenshots
 
-The two full-screen images above show the two digit layouts. In v1.0.0 the settings UI is Chinese only; the images below are included so you can see how much is configurable, and an English UI is planned for a later release.
+The two full-screen images above show the two digit layouts. The interface language can follow the system or be set to Chinese or English; the four images below show the Chinese UI. The top row is the Settings window in light and dark; the bottom row is the full-screen setup drawer in light and dark. UI appearance never touches the clock face — that is decided by the theme.
 
-| Appearance / themes | Time and date |
+| Settings · light UI | Settings · dark UI |
 | --- | --- |
-| <img src="./assets/screenshots/zh/appearance.jpg" alt="Appearance settings page" width="700"> | <img src="./assets/screenshots/zh/time-and-date.jpg" alt="Time and date settings page" width="700"> |
+| <img src="./assets/screenshots/zh/settings-appearance-light.jpg" alt="Settings window with light UI" width="700"> | <img src="./assets/screenshots/zh/settings-appearance-dark.jpg" alt="Settings window with dark UI" width="700"> |
 
-| Sound | Full-screen clock |
+| Full-screen setup · light drawer | Full-screen setup · dark drawer |
 | --- | --- |
-| <img src="./assets/screenshots/zh/sound.jpg" alt="Sound settings page" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="Full-screen flip clock" width="700"> |
+| <img src="./assets/screenshots/zh/fullscreen-setup-light.jpg" alt="Light full-screen setup drawer" width="700"> | <img src="./assets/screenshots/zh/fullscreen-setup-dark.jpg" alt="Dark full-screen setup drawer" width="700"> |
 
 ## Privacy and boundaries
 
@@ -116,6 +112,12 @@ The existing window is brought forward; no second background instance is created
 
 **Why does the clock get clipped at large scale?**
 Clock scale goes up to 450% by design. Above a certain size the cards extend past the screen edge rather than being silently shrunk, so what you see in the preview is what you get.
+
+**What is the difference between UI appearance and a theme?**
+UI appearance changes only the light/dark look of the Settings window and the full-screen setup drawer. The clock face is decided by the theme.
+
+**Will a custom theme break if I move its images?**
+No. Images are copied into the configuration directory when you pick them, so moving or deleting the originals does not affect the theme.
 
 ## Build from source
 

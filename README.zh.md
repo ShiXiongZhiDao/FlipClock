@@ -7,24 +7,20 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue" alt="Windows 10/11 x64">
   <img src="https://img.shields.io/badge/languages-zh%20%C2%B7%20en-orange" alt="中英文文档">
   <img src="https://img.shields.io/badge/data-local%20only-green" alt="仅本地运行">
-  <img src="https://img.shields.io/badge/release-v1.0.0-green" alt="v1.0.0">
+  <img src="https://img.shields.io/badge/release-v1.0.1-green" alt="v1.0.1">
 </p>
 
 <p align="center"><img src="./assets/screenshots/clock-per-pair.jpg" alt="FlipClock 全屏时钟，两位一卡" width="880"></p>
 
 ## 它能做什么
 
-FlipClock 把 Windows 桌面变成一台机械翻页钟。每位数字住在一张带中缝的翻页卡里：上叶片折下、下叶片翻入，同时实时合成一声短促的机械响——不打包任何音频文件。
+FlipClock 把 Windows 桌面变成一台机械翻页钟：翻页动画与音效实时合成，不打包音频文件。
 
-- 三套钟面主题：经典炭灰 / OLED 纯黑 / 复古暖白。
-- 两种数字排布：一位一卡（四张竖卡）或两位一卡（两张方卡）。翻页时序与音效完全相同，只改变分组方式。
-- 24 / 12 小时制。12 小时制下小时补零（`09` 而不是 `9`），让两种排布保持对称。
-- 日期行、秒数、分隔点（时分组之间的两个小圆点，俗称时间冒号）均可开关。
-- 时钟缩放 50%–450%（默认 225%）、亮度 20%–100%（只压暗不提亮）、三款数字字体（Bebas Neue 随包 / Bahnschrift / 系统默认）。
-- 可选主显示器或全部显示器；无参数启动可进设置窗口，也可直接全屏。
-- 系统托盘：左键打开设置，右键菜单「打开设置 / 全屏时钟 / 开机自启 / 退出」。关闭设置窗口默认隐藏到托盘，真正退出只走托盘菜单。
-- 可选开机自启（默认关）：登录后只驻留托盘、不弹窗；再次启动会唤起已有窗口，不会多开一个后台实例。
-- 屏保组件（`.scr`）与主程序是字节级相同的二进制，可按当前用户安装，不需要管理员权限。
+- **主题** — 五个内置主题；背景、卡片、数字等六个部件可自由搭配材质与颜色，支持自定义图片。主题自带时钟设置，切换即换整套钟面。
+- **钟面** — 一位一卡或两位一卡，24/12 小时制，日期、秒与分隔点可开关；缩放、亮度、字体可调。
+- **编辑** — 双击钟面进入全屏配置：左边看效果、右边改参数，「保存」一次写入、「放弃」全部回滚。
+- **窗口** — 两栏设置，左侧常驻预览、右侧五个页签；界面语言与明暗（跟随系统 / 浅 / 深）可选，明暗只改外壳不动钟面。
+- **运行** — 托盘常驻、开机自启，可选主屏或全屏；同一二进制也是可注册的 `.scr` 屏保，按当前用户安装，无需管理员权限。
 
 <p align="center"><img src="./assets/screenshots/clock-per-digit-colon.jpg" alt="一位一卡带冒号布局" width="880"></p>
 
@@ -54,15 +50,16 @@ FlipClock 把 Windows 桌面变成一台机械翻页钟。每位数字住在一�
 
 ## 界面长什么样
 
-上面两张全屏图是两种数字排布。**v1.0.0 的设置界面为中文**；下面几张图只为说明有哪些可调项，英文界面计划在后续版本提供。
+上面两张全屏图是两种数字排布。界面语言可选「跟随系统 / 中文 / 英文」，下面四张均为中文界面：
+上排是设置窗口的浅色与深色外壳，下排是全屏配置抽屉的浅色与深色。外壳明暗与钟面无关——钟面由主题决定。
 
-| 外观主题 | 时间与日期 |
+| 设置窗口 · 浅色外观 | 设置窗口 · 深色外观 |
 | --- | --- |
-| <img src="./assets/screenshots/zh/appearance.jpg" alt="外观主题设置页" width="700"> | <img src="./assets/screenshots/zh/time-and-date.jpg" alt="时间与日期设置页" width="700"> |
+| <img src="./assets/screenshots/zh/settings-appearance-light.jpg" alt="浅色外观的设置窗口" width="700"> | <img src="./assets/screenshots/zh/settings-appearance-dark.jpg" alt="深色外观的设置窗口" width="700"> |
 
-| 声音 | 全屏时钟 |
+| 全屏配置 · 浅色抽屉 | 全屏配置 · 深色抽屉 |
 | --- | --- |
-| <img src="./assets/screenshots/zh/sound.jpg" alt="声音设置页" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="全屏翻页时钟" width="700"> |
+| <img src="./assets/screenshots/zh/fullscreen-setup-light.jpg" alt="浅色全屏配置抽屉" width="700"> | <img src="./assets/screenshots/zh/fullscreen-setup-dark.jpg" alt="深色全屏配置抽屉" width="700"> |
 
 ## 隐私与边界
 
@@ -116,6 +113,12 @@ FlipClock 把 Windows 桌面变成一台机械翻页钟。每位数字住在一�
 
 **放得很大时钟面为什么会被裁掉？**
 时钟缩放上限就是 450%。超过屏幕范围时卡片会如实伸出屏幕，而不是悄悄缩小——预览里看到的就是实际效果。
+
+**「界面外观」和「主题」有什么区别？**
+界面外观只改设置窗口与全屏配置抽屉的明暗，跟钟面无关；钟面的颜色与材质由主题决定。
+
+**自定义主题的图片移到别处会失效吗？**
+不会。选图时图片已复制进配置目录，原文件之后移动或删除都不影响主题。
 
 ## 从源码构建
 
