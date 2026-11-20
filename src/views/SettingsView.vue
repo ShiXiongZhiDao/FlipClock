@@ -101,35 +101,6 @@ function closeWindow() {
 
 const { toast, notify } = useToast(2800);
 
-/** `ResizeDirection` 是 Tauri 的内部类型、没有导出，这里按它的字面量重复一遍。 */
-type ResizeSide =
-  | "East"
-  | "North"
-  | "NorthEast"
-  | "NorthWest"
-  | "South"
-  | "SouthEast"
-  | "SouthWest"
-  | "West";
-
-/** 八个方向的把手。角上的热区要略大，否则很难命中。 */
-const RESIZE_EDGES: Array<{ name: string; side: ResizeSide }> = [
-  { name: "n", side: "North" },
-  { name: "s", side: "South" },
-  { name: "e", side: "East" },
-  { name: "w", side: "West" },
-  { name: "ne", side: "NorthEast" },
-  { name: "nw", side: "NorthWest" },
-  { name: "se", side: "SouthEast" },
-  { name: "sw", side: "SouthWest" },
-];
-
-function startResize(side: ResizeSide) {
-  void getCurrentWindow().startResizeDragging(side).catch((error: unknown) => {
-    console.warn("start resize dragging failed", error);
-  });
-}
-
 // 保存成功不再占用页面文字；失败仍然要让人看见。
 watch(error, (value) => {
   if (value) notify(t("settings.saveFailed", { error: errorText(value) }));
@@ -198,12 +169,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="shell">
-    <!-- 自绘标题栏去掉了原生边框，Windows 就不再提供边缘缩放热区。
-         没有这八个把手，resizable(true) 等于摆设——窗口看起来「被锁住了」。 -->
-    <div class="resize-frame" aria-hidden="true">
-      <div v-for="dir in RESIZE_EDGES" :key="dir.name" class="rh" :class="dir.name" @pointerdown="startResize(dir.side)" />
-    </div>
-
     <div class="app">
       <aside class="preview-panel">
         <header class="brand-row">
@@ -247,8 +212,33 @@ onBeforeUnmount(() => {
 
         <section class="quick-card">
           <div class="quick-head">{{ t("preview.quickSettings") }}</div>
-          <div class="quick-row">
-            <span class="quick-label">{{ t("time.format") }}</span>
+          <div class="quick-inline">
+            <div class="quick-toggles">
+              <button
+                type="button"
+                class="quick-toggle"
+                :class="{ active: profile.showDate }"
+                @click="profile.showDate = !profile.showDate"
+              >
+                {{ t("profile.date") }}
+              </button>
+              <button
+                type="button"
+                class="quick-toggle"
+                :class="{ active: profile.showSeconds }"
+                @click="profile.showSeconds = !profile.showSeconds"
+              >
+                {{ t("profile.seconds") }}
+              </button>
+              <button
+                type="button"
+                class="quick-toggle"
+                :class="{ active: profile.showColon }"
+                @click="profile.showColon = !profile.showColon"
+              >
+                {{ t("profile.colon") }}
+              </button>
+            </div>
             <div class="quick-segment">
               <button
                 type="button"
@@ -266,32 +256,6 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <div class="quick-toggles">
-            <button
-              type="button"
-              class="quick-toggle"
-              :class="{ active: profile.showDate }"
-              @click="profile.showDate = !profile.showDate"
-            >
-              {{ t("profile.date") }}
-            </button>
-            <button
-              type="button"
-              class="quick-toggle"
-              :class="{ active: profile.showSeconds }"
-              @click="profile.showSeconds = !profile.showSeconds"
-            >
-              {{ t("profile.seconds") }}
-            </button>
-            <button
-              type="button"
-              class="quick-toggle"
-              :class="{ active: profile.showColon }"
-              @click="profile.showColon = !profile.showColon"
-            >
-              {{ t("profile.colon") }}
-            </button>
-          </div>
         </section>
       </aside>
 
@@ -300,19 +264,6 @@ onBeforeUnmount(() => {
           <div class="drag-layer" data-tauri-drag-region></div>
           <span class="settings-label">{{ t("settings.title") }}</span>
           <div class="top-actions">
-            <button
-              class="icon-action"
-              type="button"
-              :title="t('studio.open')"
-              :aria-label="t('studio.open')"
-              @click="openFullscreenSetup"
-            >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M3 5h10M3 11h10" />
-                <circle cx="6" cy="5" r="1.6" />
-                <circle cx="10" cy="11" r="1.6" />
-              </svg>
-            </button>
             <button
               class="icon-action"
               type="button"
@@ -383,50 +334,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.resize-frame {
-  position: fixed;
-  inset: 0;
-  z-index: 400;
-  pointer-events: none;
-}
-
-.rh {
-  position: absolute;
-  pointer-events: auto;
-}
-
-.rh.n,
-.rh.s {
-  left: 10px;
-  right: 10px;
-  height: 5px;
-  cursor: ns-resize;
-}
-.rh.n { top: 0; }
-.rh.s { bottom: 0; }
-
-.rh.e,
-.rh.w {
-  top: 10px;
-  bottom: 10px;
-  width: 5px;
-  cursor: ew-resize;
-}
-.rh.e { right: 0; }
-.rh.w { left: 0; }
-
-.rh.ne,
-.rh.nw,
-.rh.se,
-.rh.sw {
-  width: 12px;
-  height: 12px;
-}
-.rh.ne { top: 0; right: 0; cursor: nesw-resize; }
-.rh.nw { top: 0; left: 0; cursor: nwse-resize; }
-.rh.se { bottom: 0; right: 0; cursor: nwse-resize; }
-.rh.sw { bottom: 0; left: 0; cursor: nesw-resize; }
-
 .shell {
   position: relative;
   height: 100vh;
@@ -449,20 +356,33 @@ onBeforeUnmount(() => {
 }
 
 .preview-panel {
+  /* 内边距写成变量：拖拽层要按它取负值铺到窗口边缘，两边必须同源。 */
+  --pad-top: 12px;
+  --pad-x: 22px;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px 22px 16px;
+  padding: var(--pad-top) var(--pad-x) 16px;
   background: var(--ui-surface-sunken);
   border-right: 1px solid var(--ui-line);
 }
 
 /* 拖拽层铺满整条但垫在内容下面：把 data-tauri-drag-region 直接放在
-   header 上会连按钮的点击一起吞掉。 */
+   header 上会连按钮的点击一起吞掉（按钮与品牌块都有 z-index: 1，画在它上面）。
+
+   无边框窗口没有系统标题栏，**窗口顶边那一圈必须也能拖**。原先只写 inset: 0，
+   而两块面板各有 20px 上内边距，于是最上面 20px 是一条死区——鼠标停在窗口边缘
+   拖不动，看起来像「只有栏里面能拖」。负的 inset 正好吃掉这段内边距。 */
 .drag-layer {
   position: absolute;
   inset: 0;
+}
+
+/* 只有这两条 header 需要吃掉面板内边距；.preview-heading 里那条留在原地。 */
+.brand-row > .drag-layer,
+.settings-top > .drag-layer {
+  inset: calc(-1 * var(--pad-top)) calc(-1 * var(--pad-x)) 0;
 }
 
 .brand-row {
@@ -489,8 +409,10 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   display: grid;
   place-items: center;
-  background: #292a2d;
-  color: #fff;
+  background: var(--ui-brand-tile);
+  color: var(--ui-brand-ink);
+  /* 深色外壳里靠一圈亮边定形，浅色档是 transparent */
+  box-shadow: inset 0 0 0 1px var(--ui-tile-ring);
   font-size: 14px;
   font-weight: 650;
 }
@@ -549,7 +471,7 @@ onBeforeUnmount(() => {
   padding: 5px;
   border-radius: 8px;
   background: var(--ui-well);
-  box-shadow: inset 0 1px 2px rgba(60, 55, 45, 0.09);
+  box-shadow: var(--ui-well-inset);
 }
 
 /* 钟面是一条居中的「屏幕」带，不是整栏铺满：默认主题本来就深，
@@ -577,16 +499,15 @@ onBeforeUnmount(() => {
   color: var(--ui-text);
 }
 
-.quick-row {
+/* 时间制式与三个勾选块同处一行：勾选靠左、制式靠右。
+   左栏最窄 336px，放不下时整行换行（宁可换行，也不要挤成两截）。
+   间距比原来紧一档：省下的横向空间刚好让两者在最窄栏里并排。 */
+.quick-inline {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-}
-
-.quick-label {
-  font-size: 11px;
-  color: var(--ui-text-muted);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .quick-segment {
@@ -598,7 +519,7 @@ onBeforeUnmount(() => {
 }
 
 .quick-segment button {
-  padding: 5px 10px;
+  padding: 5px 8px;
   border-radius: 3px;
   font-size: 10.5px;
   color: var(--ui-text-secondary);
@@ -615,7 +536,7 @@ onBeforeUnmount(() => {
 .quick-toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
 }
 
 /* 勾选块而不是开关：三项都是「加一块内容」，勾选框比一排绿色开关更轻，
@@ -623,8 +544,8 @@ onBeforeUnmount(() => {
 .quick-toggle {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 8px 4px 5px;
+  gap: 6px;
+  padding: 4px 7px 4px 5px;
   border-radius: 5px;
   font-size: 11px;
   color: var(--ui-text-secondary);
@@ -632,16 +553,16 @@ onBeforeUnmount(() => {
 }
 
 .quick-toggle:hover {
-  background: #ebebee;
+  background: var(--ui-hover);
 }
 
 .quick-toggle::before {
   content: "";
   width: 14px;
   height: 14px;
-  border: 1px solid #b6b3ac;
+  border: 1px solid var(--ui-check-line);
   border-radius: 2px;
-  background: #fff;
+  background: var(--ui-check-bg);
 }
 
 .quick-toggle.active {
@@ -654,24 +575,26 @@ onBeforeUnmount(() => {
   place-items: center;
   background: var(--ui-accent);
   border-color: var(--ui-accent);
-  color: #fff;
+  color: var(--ui-accent-ink);
   font-size: 10px;
   font-weight: 700;
 }
 
 .settings-panel {
+  --pad-top: 12px;
+  --pad-x: 26px;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px 26px 10px;
+  padding: var(--pad-top) var(--pad-x) 10px;
   background: var(--ui-surface);
 }
 
 .settings-top {
   position: relative;
-  /* 缩放热区盖在整窗边缘之上（z-index 400），这一行必须更高一层，
-     否则右上角的最小化/关闭会被边角热区抢走点击。 */
+  /* 这一行压在拖拽层之上：右上角的最小化/关闭必须收得到点击。
+     （窗口已固定尺寸，不再有边缘缩放热区。） */
   z-index: 500;
   flex: none;
   display: flex;
@@ -690,24 +613,37 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* 动作按钮与交通灯同层：必须盖在拖拽层上才收得到点击。 */
+/* 动作按钮与交通灯同层：必须盖在拖拽层上才收得到点击。
+   左侧品牌块留在 --pad-x（22px）与内容列对齐，右侧这几个贴边（15px）——
+   不对称是刻意的：左边是产品名，右边是窗口控件。
+   右边距取负值把它贴到窗口边缘（26 - 12 = 14px）：这几个是窗口控件，
+   该像窗口控件那样贴边，而不是跟下面的内容列对齐——否则右侧会空出一大块，
+   和 12px 的上边距摆在一起显得整条栏偏左。 */
 .top-actions {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
+  /* 热区连成一条，中间不留点不到的死缝；视觉间隔由图标/圆点自身的留白给。
+     负边距把窗口控件拉到距窗口 15px：26（面板内边距）− 12 = 14，再加壳体 1px 描边。
+     写成 calc 是为了跟着 --pad-x 走，改内边距时不会重新分叉。 */
+  gap: 0;
+  margin-right: calc(-1 * (var(--pad-x) - 14px));
 }
 
+/* 点击面积按「窗口控件」给：46×34，和 Edge 的窗口按钮同一量级——
+   比 26px 的标题栏还高出 4px 上下，宽度也远超图标本身。
+   视觉大小与点击大小分开：14px 的图标/圆点好认，46px 的长条好点。
+   宁可让按钮溢出标题栏，也不为了塞进去把热区压回 26px。 */
 .icon-action {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 22px;
+  width: 46px;
+  height: 34px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
-  color: #6f6c65;
+  color: var(--ui-icon);
   transition: background 0.14s ease, color 0.14s ease;
 }
 
@@ -725,33 +661,53 @@ onBeforeUnmount(() => {
 .traffic {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: 10px;
+  /* 钮与钮之间不留缝：视觉间隔由圆点两侧的透明留白给，热区连成一片。 */
+  gap: 0;
+  margin-left: 0;
 }
 
+/* 交通灯：46×34 的透明热区 + 居中的 14px 圆点。
+   圆点用伪元素画，颜色由 --light 给——按钮本身必须透明，
+   否则点一下就是整块色块。 */
 .light {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border-radius: 5px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.light::before {
+  content: "";
   width: 14px;
   height: 14px;
-  padding: 0;
   border-radius: 50%;
+  background: var(--light);
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
-  transition: filter 0.14s ease;
-}
-
-.light-close {
-  background: #ff5f57;
-}
-
-.light-min {
-  background: #febc2e;
+  transition: filter 0.12s ease;
 }
 
 .light:hover {
+  background: var(--ui-surface-2);
+}
+
+.light:hover::before {
   filter: brightness(0.9);
 }
 
-.light:active {
+.light:active::before {
   filter: brightness(0.78);
+}
+
+.light-close {
+  --light: var(--ui-traffic-close);
+}
+
+.light-min {
+  --light: var(--ui-traffic-min);
 }
 
 /* 横向页签：只有文字 + 一条墨色细线，没有图标也没有底色块。
@@ -846,7 +802,7 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--ui-divider);
   font-size: 9px;
   letter-spacing: 0.2px;
-  color: #9a978f;
+  color: var(--ui-text-faint);
 }
 
 .toast {
@@ -858,9 +814,9 @@ onBeforeUnmount(() => {
   padding: 8px 13px;
   font-size: 11px;
   border-radius: 4px;
-  background: #1b1b1a;
-  color: #fff;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+  background: var(--ui-toast-bg);
+  color: var(--ui-toast-ink);
+  box-shadow: var(--ui-shadow-toast);
 }
 
 .toast-enter-active,

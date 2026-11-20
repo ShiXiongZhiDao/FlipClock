@@ -5,7 +5,13 @@
    界面再配一套蓝，就成了两块互不相干的配色系统。
 
    层级只靠 1px 细线与留白，不用玻璃、掠光、彩色投影。
-   颜色只留给「有含义」的地方：已安装的绿点、失败的红、提醒的琥珀。 */
+   颜色只留给「有含义」的地方：已安装的绿点、失败的红、提醒的琥珀。
+
+   **两套色板**（ADR-0025）：下面是浅色，`:root[data-appearance="dark"]` 是深色。
+   令牌名一一对应，组件里不许再出现十六进制色值——除了一组常量：
+   坐在主题色上的控件（主题卡图标钮）、品牌方块、交通灯、金色提醒，
+   以及时钟示意图里的迷你翻页卡。它们的底色来自「内容」而不是「外壳」，
+   深色档必须保持不变，否则就认不出那是同一件东西。 */
 :root {
   /* 窗口圆角内的最底层，只在两块面板交界与裁角处露出 */
   --ui-bg: #e6e4e0;
@@ -17,22 +23,34 @@
   --ui-surface-3: #eceae6;
   /* 钟面嵌进去的那条凹槽：像把屏幕镶进面板，而不是贴在墙上 */
   --ui-well: #e7e5e0;
+  --ui-well-inset: inset 0 1px 2px rgba(60, 55, 45, 0.09);
 
   --ui-text: #1b1b1a;
   /* 旧组件按这个名字取主文字色，这里给同一颜色，避免 var() 落空后继承出意外 */
   --ui-text-primary: #1b1b1a;
   --ui-text-secondary: #55534e;
   --ui-text-muted: #8a8880;
+  /* 页脚、版本号这类「几乎不看但需要在场」的字 */
+  --ui-text-faint: #9a978f;
+  /* 段落名与纯图标按钮的字色：比次级文字浅、比 muted 深 */
+  --ui-text-label: #6f6c65;
+  /* 状态徽标前面那个小圆点 */
+  --ui-dot: #b3b0a9;
 
   /* 强调色就是墨：没有第二套色相，就没有「主题色」这回事 */
   --ui-accent: #1b1b1a;
   --ui-accent-ink: #ffffff;
   --ui-accent-soft: rgba(27, 27, 26, 0.055);
+  --ui-accent-hover: #33332f;
 
   /* 外壳与面板的外框比段落之间的细线深一档，两层边界不会粘连 */
   --ui-line: #d9d6d0;
+  /* 可交互容器的悬停描边：比常态的线深一档，但不至于像选中态 */
+  --ui-line-hover: #bdbab3;
   --ui-divider: #ebe8e3;
   --ui-divider-strong: #dedbd5;
+  /* 抽屉里分组之间的细线，比 --ui-divider 还浅 */
+  --ui-divider-soft: #f0ede8;
 
   /* 只有这三个颜色带语义，其余一律是灰 */
   --ui-success: #2f6f4f;
@@ -42,6 +60,16 @@
   --ui-track: #efede9;
   --ui-thumb: #ffffff;
   --ui-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  /* 浮层投影：深色底上 12% 的黑影等于没有，所以这几条深色档要加重。
+     只给「有高度」的东西：弹窗、抽屉、toast。1–2px 的倒角阴影不在此列。 */
+  --ui-shadow-dialog: 0 12px 40px rgba(0, 0, 0, 0.28);
+  --ui-shadow-drawer: -18px 0 48px rgba(0, 0, 0, 0.26);
+  --ui-shadow-peek: -6px 0 18px rgba(0, 0, 0, 0.18);
+  --ui-shadow-toast: 0 3px 12px rgba(0, 0, 0, 0.2);
+  /* 弹窗遮罩：压暗的是外壳，所以两档都要给——深色档用更重的一层，
+     否则 #121110 上叠 42% 黑几乎看不出「后面被挡住了」。 */
+  --ui-scrim: rgba(0, 0, 0, 0.42);
+  --ui-slider-thumb: #ffffff;
   --ui-scroll: #cfcbc4;
 
   /* 开关：38×22 的墨底 + 18px 白钮。不用 iOS 绿——那是手机的语汇，
@@ -51,8 +79,66 @@
   --ui-switch-pad: 2px;
   --ui-knob: 18px;
   --ui-knob-off: #ffffff;
+  --ui-knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  /* 开启时钮的底色：浅色档是白钮压墨轨；深色档必须反过来，
+     否则白钮会融进已经被反转为亮的轨道。 */
+  --ui-knob-on: #ffffff;
   --ui-knob-travel: 16px;
   --ui-switch-on: #1b1b1a;
+  --ui-switch-off: #d5d2cc;
+
+  /* 键盘焦点环。不能写死墨色：深色外壳上墨环等于没有。 */
+  --ui-focus: rgba(27, 27, 26, 0.3);
+
+  /* 悬停底、勾选框、次级图标、hero 底、toast——原先散落在组件里的字面量 */
+  --ui-hover: #ebebee;
+  --ui-check-line: #b6b3ac;
+  --ui-check-bg: #ffffff;
+  --ui-icon: var(--ui-text-label);
+  --ui-hero: #fbfaf8;
+  --ui-toast-bg: #1b1b1a;
+  --ui-toast-ink: #ffffff;
+  /* 成功/失败的浅底：只给状态条，不给正文 */
+  --ui-success-soft: rgba(47, 111, 79, 0.09);
+  --ui-danger-soft: rgba(168, 67, 58, 0.08);
+  /* 文字链接的下划线 */
+  --ui-link-line: rgba(27, 27, 26, 0.38);
+  --ui-link-line-hover: rgba(27, 27, 26, 0.75);
+  /* 全屏配置抽屉：半透明磨砂，让钟面透出一点底色。深色档必须换成暗色渐变，
+     否则就是一块发光的白板压在钟面上。 */
+  --ui-drawer-top: rgba(255, 255, 255, 0.84);
+  --ui-drawer-bottom: rgba(240, 239, 235, 0.92);
+  --ui-peek-bg: rgba(255, 255, 255, 0.86);
+
+  /* ↓ 以下常量两套色板相同：底色来自内容，不来自外壳。 */
+  /* 品牌方块照抄应用图标：深色卡片 + 白字。深色外壳里靠一圈亮边定形。 */
+  --ui-brand-tile: #292a2d;
+  --ui-brand-ink: #ffffff;
+  --ui-tile-ring: transparent;
+  /* 交通灯就是那三颗的颜色，不随外壳变 */
+  --ui-traffic-close: #ff5f57;
+  --ui-traffic-min: #febc2e;
+  /* 金色提醒：琥珀在明暗两套底上都要能读，所以两套共用 */
+  --ui-gold: #d4ad61;
+  --ui-gold-soft: rgba(212, 173, 97, 0.14);
+  /* 时间与日期页的迷你翻页卡：它画的是钟面，不是界面 */
+  --ui-mini-card: #37383c;
+  --ui-mini-ink: #f6f6f4;
+  /* 主题卡上的图标钮：压在用户选的主题色上，绝不能跟着外壳翻转 */
+  --ui-on-theme: rgba(18, 18, 16, 0.6);
+  --ui-on-theme-hover: rgba(18, 18, 16, 0.86);
+  --ui-on-theme-ink: #ffffff;
+  --ui-on-theme-ring: rgba(255, 255, 255, 0.34);
+  --ui-on-theme-ring-hover: rgba(255, 255, 255, 0.52);
+  /* 悬停时让样卡「浮起」的那层投影。深色底上 12% 的黑影等于没有，深色档要加重——
+     所以它不是内容层常量，下面三条才是。 */
+  --ui-shadow-float: 0 4px 14px rgba(0, 0, 0, 0.12);
+  /* ↓ 以下三条恒定：底色来自内容（画布 / 钟面），不来自外壳。 */
+  /* 全屏配置里的 toast 落在钟面画布上，不落在抽屉上——它是内容层，两套共用。 */
+  --ui-overlay-toast-bg: rgba(20, 20, 22, 0.9);
+  --ui-overlay-toast-ink: #ffffff;
+  /* 屏保预览的底：那是「屏幕」，不是界面。 */
+  --ui-preview-backdrop: #111315;
 
   /* 壳体圆角必须与 Rust 侧 SHELL_RADIUS 一致：窗口区域按它裁，
      CSS 圆角对不上就会在四个角露出一圈 body 底色。
@@ -67,4 +153,86 @@
   --font-mono: "Cascadia Mono", Consolas, monospace;
 
   color-scheme: light;
+}
+
+/* 深色外壳（ADR-0025）。
+   选暖黑而不是中性灰：浅色那一套是暖的（#e6e4e0 底、墨字），
+   深色侧若改用 macOS 那种中性灰，明暗两版就不是同一个家族，切一次像换了软件。
+   也不是 OLED 纯黑：这个界面全靠 1px 细线分层，线与底没有明度差时层级会塌。
+
+   强调色必须反转为暖白。深色壳里再画墨色等于没画——主按钮、选中态、
+   开关轨道都靠这一条。语义三色提亮一档，否则在 #201f1d 上读不清。 */
+:root[data-appearance="dark"] {
+  --ui-bg: #121110;
+  --ui-surface-sunken: #191817;
+  --ui-surface: #201f1d;
+  --ui-surface-2: #2a2825;
+  --ui-surface-3: #33302d;
+  --ui-well: #0d0c0b;
+  --ui-well-inset: inset 0 1px 3px rgba(0, 0, 0, 0.55);
+
+  --ui-text: #f1eee9;
+  --ui-text-primary: #f1eee9;
+  --ui-text-secondary: #b6b0a7;
+  --ui-text-muted: #8c857c;
+  --ui-text-faint: #7b756d;
+  --ui-text-label: #a39c92;
+  --ui-dot: #5c574f;
+
+  --ui-accent: #f1eee9;
+  --ui-accent-ink: #1b1a18;
+  --ui-accent-soft: rgba(241, 238, 233, 0.07);
+  --ui-accent-hover: #ffffff;
+
+  --ui-line: #3c3935;
+  --ui-line-hover: #5b5750;
+  --ui-divider: #2c2a27;
+  --ui-divider-strong: #3f3b37;
+  --ui-divider-soft: #292724;
+
+  --ui-success: #66b58c;
+  --ui-danger: #e08074;
+  --ui-warn: #d8a94f;
+
+  /* 轨道与选中块必须拉开一档：浅色是白块压浅轨，10 级灰差就够；
+     深色下同样的差值几乎看不出来，实测选中态像没选中。 */
+  --ui-track: #2e2c29;
+  --ui-thumb: #4a4640;
+  --ui-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --ui-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.66);
+  --ui-shadow-drawer: -18px 0 48px rgba(0, 0, 0, 0.62);
+  --ui-shadow-peek: -6px 0 18px rgba(0, 0, 0, 0.5);
+  --ui-shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --ui-scrim: rgba(0, 0, 0, 0.62);
+  --ui-slider-thumb: #1f1e1c;
+  --ui-scroll: #4a4640;
+
+  --ui-knob-off: #e9e5df;
+  --ui-knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --ui-knob-on: #1b1a18;
+  --ui-switch-on: #f1eee9;
+  --ui-switch-off: #3d3a36;
+
+  --ui-focus: rgba(241, 238, 233, 0.38);
+
+  --ui-hover: #2a2825;
+  --ui-check-line: #4d4943;
+  --ui-check-bg: #262421;
+  --ui-hero: #242320;
+  /* toast 跟着反转：深色壳里一块墨色 toast 会沉进背景 */
+  --ui-toast-bg: #f1eee9;
+  --ui-toast-ink: #1b1a18;
+  --ui-success-soft: rgba(102, 181, 140, 0.14);
+  --ui-danger-soft: rgba(224, 128, 116, 0.14);
+  --ui-link-line: rgba(241, 238, 233, 0.4);
+  --ui-link-line-hover: rgba(241, 238, 233, 0.82);
+  --ui-drawer-top: rgba(37, 35, 32, 0.86);
+  --ui-drawer-bottom: rgba(25, 24, 22, 0.94);
+  --ui-peek-bg: rgba(38, 36, 33, 0.86);
+
+  /* 品牌方块在深色壳里需要一圈亮边，否则深底方块贴着深色面板没有边界 */
+  --ui-tile-ring: rgba(255, 255, 255, 0.16);
+  --ui-shadow-float: 0 6px 20px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }

@@ -1133,13 +1133,14 @@ onBeforeUnmount(() => {
   width: 400px;
   display: flex;
   flex-direction: column;
-  /* 半透明 + 模糊：钟面仍能透出一点底色，但文字区靠白底保证可读。 */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(240, 239, 235, 0.92));
+  /* 半透明 + 模糊：钟面仍能透出一点底色，但文字区靠这层底色保证可读。
+     深浅两档由令牌给：深色档是暗色渐变，否则就是一块发光的白板压在钟面上。 */
+  background: linear-gradient(180deg, var(--ui-drawer-top), var(--ui-drawer-bottom));
   backdrop-filter: blur(22px) saturate(1.1);
   border-left: 1px solid var(--ui-line);
   border-top-left-radius: 18px;
   border-bottom-left-radius: 18px;
-  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.26);
+  box-shadow: var(--ui-shadow-drawer);
   transition: transform 0.34s cubic-bezier(0.22, 0.8, 0.24, 1), opacity 0.22s ease;
   will-change: transform;
 }
@@ -1165,10 +1166,10 @@ onBeforeUnmount(() => {
   border: 1px solid var(--ui-line);
   border-right: 0;
   border-radius: 10px 0 0 10px;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--ui-peek-bg);
   backdrop-filter: blur(14px);
   color: var(--ui-text);
-  box-shadow: -6px 0 18px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--ui-shadow-peek);
 }
 
 .drawer-peek:hover {
@@ -1262,7 +1263,7 @@ onBeforeUnmount(() => {
 }
 
 .group + .group {
-  border-top: 1px solid #f0ede8;
+  border-top: 1px solid var(--ui-divider-soft);
 }
 
 .group-title {
@@ -1433,8 +1434,8 @@ onBeforeUnmount(() => {
 }
 
 .primary:hover {
-  background: #33332f;
-  border-color: #33332f;
+  background: var(--ui-accent-hover);
+  border-color: var(--ui-accent-hover);
 }
 
 .secondary {
@@ -1476,7 +1477,7 @@ onBeforeUnmount(() => {
   border: 0;
   padding: var(--ui-switch-pad);
   border-radius: 20px;
-  background: #d5d2cc;
+  background: var(--ui-switch-off);
   position: relative;
   transition: background 0.18s ease;
 }
@@ -1489,7 +1490,7 @@ onBeforeUnmount(() => {
   height: var(--ui-knob);
   border-radius: 50%;
   background: var(--ui-knob-off);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--ui-knob-shadow);
   transition: transform 0.18s ease;
 }
 
@@ -1498,6 +1499,7 @@ onBeforeUnmount(() => {
 }
 
 .switch.on i {
+  background: var(--ui-knob-on);
   transform: translateX(var(--ui-knob-travel));
 }
 
@@ -1505,8 +1507,8 @@ onBeforeUnmount(() => {
   margin-top: 12px;
   padding: 7px 9px;
   border-radius: 7px;
-  background: rgba(212, 173, 97, 0.14);
-  color: #d4ad61;
+  background: var(--ui-gold-soft);
+  color: var(--ui-gold);
   font-size: 10.5px;
   line-height: 1.5;
 }
@@ -1525,6 +1527,15 @@ onBeforeUnmount(() => {
 .theme-item {
   position: relative;
   border-radius: 4px;
+  /* 悬停放大 3.5%，与设置页主题墙同一手感（同一个数值与时长）。
+     抽屉左右各有 12px 内边距，190px 的卡放大 3.5% 只外扩 3.3px，不会被裁。 */
+  transition: transform 0.16s ease;
+}
+
+.theme-item:hover {
+  transform: scale(1.035);
+  /* 放大后压在邻卡之上，否则会被后一张盖住半个角。 */
+  z-index: 3;
 }
 
 .in-use-badge {
@@ -1651,7 +1662,7 @@ onBeforeUnmount(() => {
   z-index: 9020;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--ui-scrim);
 }
 
 .confirm {
@@ -1727,7 +1738,7 @@ onBeforeUnmount(() => {
 }
 
 .confirm-choice.primary:hover {
-  background: #333330;
+  background: var(--ui-accent-hover);
 }
 
 .confirm-continue {
@@ -1754,8 +1765,8 @@ onBeforeUnmount(() => {
   z-index: 9030;
   padding: 8px 14px;
   border-radius: 8px;
-  background: rgba(20, 20, 22, 0.9);
-  color: #fff;
+  background: var(--ui-overlay-toast-bg);
+  color: var(--ui-overlay-toast-ink);
   font-size: 11px;
 }
 </style>

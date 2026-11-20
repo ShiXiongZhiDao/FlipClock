@@ -190,7 +190,7 @@ onMounted(refresh);
   margin-bottom: 14px;
   border: 1px solid var(--ui-divider-strong);
   border-radius: 4px;
-  background: #fbfaf8;
+  background: var(--ui-hero);
 }
 
 .hero-icon {
@@ -200,8 +200,10 @@ onMounted(refresh);
   display: grid;
   place-items: center;
   border-radius: 4px;
-  background: #292a2d;
-  color: #fff;
+  background: var(--ui-brand-tile);
+  color: var(--ui-brand-ink);
+  /* 深色壳里深底方块贴着深色面板没有边界，补一圈亮边 */
+  box-shadow: inset 0 0 0 1px var(--ui-tile-ring);
 }
 
 .hero-icon svg {
@@ -242,12 +244,12 @@ onMounted(refresh);
 
 .msg.ok {
   color: var(--ui-success);
-  background: rgba(47, 111, 79, 0.09);
+  background: var(--ui-success-soft);
 }
 
 .msg.err {
   color: var(--ui-danger);
-  background: rgba(168, 67, 58, 0.08);
+  background: var(--ui-danger-soft);
 }
 
 .kv {
@@ -278,14 +280,14 @@ onMounted(refresh);
   font-size: 10px;
   color: var(--ui-text-secondary);
   text-decoration: underline;
-  text-decoration-color: rgba(27, 27, 26, 0.38);
+  text-decoration-color: var(--ui-link-line);
   text-underline-offset: 3px;
   transition: color 0.12s ease, text-decoration-color 0.12s ease;
 }
 
 .mini:hover {
   color: var(--ui-text);
-  text-decoration-color: rgba(27, 27, 26, 0.75);
+  text-decoration-color: var(--ui-link-line-hover);
 }
 
 .segmented.narrow {

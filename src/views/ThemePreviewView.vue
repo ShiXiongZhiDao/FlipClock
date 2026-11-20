@@ -5,6 +5,7 @@ import { onMounted, ref } from "vue";
 import FullscreenSetupOverlay from "../components/theme/FullscreenSetupOverlay.vue";
 import { initThemeAssets } from "../lib/theme/assets";
 import { previewLanguage } from "../lib/i18n";
+import { applyAppearance } from "../lib/appearance";
 import { ensureProfiles } from "../lib/theme/profile";
 import { loadStudio, type StudioPayload } from "../lib/theme/studio";
 
@@ -36,6 +37,9 @@ onMounted(async () => {
     }
     // 本窗口的文字与日期行跟随草稿语言；托盘与持久化留到保存时。
     previewLanguage(payload.settings.ui.language);
+    // 外观同理：这个窗口不加载 useSettings（草稿不能被防抖写回），
+    // 所以必须自己把偏好落到 <html> 上，否则深色外壳里抽屉仍是浅色。
+    applyAppearance(payload.settings.ui.appearance ?? "system");
     // 主窗口构造快照时已经补齐过；这里再兜一次，手改载荷也不会出现空配置。
     ensureProfiles(payload.settings);
     loadStudio(payload);

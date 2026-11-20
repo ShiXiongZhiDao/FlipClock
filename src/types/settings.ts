@@ -91,6 +91,11 @@ export const THEME_NAME_MAX = 16;
 export type TimeFormat = "24h" | "12h";
 /** 界面语言偏好。system = 跟随系统，启动时归并为中文或英文。 */
 export type LanguagePreference = "system" | "zh" | "en";
+/**
+ * 界面外观偏好（ADR-0025）：只决定设置窗口外壳的明暗，不碰钟面。
+ * system 由 `prefers-color-scheme` 实时归并，不写盘、不重启。
+ */
+export type UiAppearance = "system" | "light" | "dark";
 export type MonitorMode = "primary" | "all";
 export type NoArgMode = "settings" | "fullscreen";
 /** 每张翻页卡承载几位数字。per-digit = 一位一卡，per-pair = 两位一卡（方卡）。 */
@@ -175,7 +180,7 @@ export interface Settings {
   /** 系统集成。开机自启的状态不在这里，它以注册表为准。 */
   system: { closeToTray: boolean };
   /** 界面文字语言。只影响文字，不影响钟面数字的字体。 */
-  ui: { language: LanguagePreference };
+  ui: { language: LanguagePreference; appearance: UiAppearance };
   launch: { noArgMode: NoArgMode };
   registration?: {
     rollbackScrnsaveExe: string | null;
@@ -231,6 +236,6 @@ export function defaultSettings(): Settings {
     screensaver: { monitorMode: "primary" },
     launch: { noArgMode: "settings" },
     system: { closeToTray: true },
-    ui: { language: "system" },
+    ui: { language: "system", appearance: "system" },
   };
 }

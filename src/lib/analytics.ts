@@ -32,7 +32,9 @@ const ALLOWED: Record<string, ReadonlySet<string | number>> = {
   digitLayout: new Set(["per-digit", "per-pair"]),
   showSeconds: new Set([0, 1]),
   showDate: new Set([0, 1]),
-  feature: new Set(["screensaver", "sound", "language"]),
+  feature: new Set(["screensaver", "sound", "language", "uiAppearance"]),
+  // 三态原样上报：压成 0/1 会让「浅色」和「深色」在看板上无法区分。
+  state: new Set(["system", "light", "dark"]),
   enabled: new Set([0, 1]),
 };
 
@@ -119,6 +121,11 @@ export function trackFeatureToggled(
   enabled: boolean,
 ): void {
   track(Events.FeatureToggled, { feature, enabled: enabled ? 1 : 0 });
+}
+
+/** 界面外观是三态，不能套用「开/关」那套布尔埋点。 */
+export function trackUiAppearance(appearance: "system" | "light" | "dark"): void {
+  track(Events.FeatureToggled, { feature: "uiAppearance", state: appearance });
 }
 
 export function trackUpdateChecked(): void {

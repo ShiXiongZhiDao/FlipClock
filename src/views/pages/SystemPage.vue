@@ -8,7 +8,7 @@ import { useSettings } from "../../composables/useSettings";
 import { isTauri } from "../../lib/env";
 import { errorText, t, type MessageKey } from "../../lib/i18n";
 import { useUpdater } from "../../lib/updater";
-import type { NoArgMode } from "../../types/settings";
+import type { NoArgMode, UiAppearance } from "../../types/settings";
 
 /**
  * 二维码与公众号横幅走公开仓库，不进安装包：换图不必重发版本，
@@ -72,6 +72,16 @@ const LANGUAGE_OPTIONS: { value: "system" | "zh" | "en"; label: MessageKey }[] =
   { value: "system", label: "language.system" },
   { value: "zh", label: "language.zh" },
   { value: "en", label: "language.en" },
+];
+
+/**
+ * 界面外观（ADR-0025）。三态而不是开关：纯布尔值表达不了「跟随系统」，
+ * 而在浅色系统上想固定深色的人也需要一个明确选项。
+ */
+const APPEARANCE_OPTIONS: { value: UiAppearance; label: MessageKey }[] = [
+  { value: "system", label: "uiAppearance.system" },
+  { value: "light", label: "uiAppearance.light" },
+  { value: "dark", label: "uiAppearance.dark" },
 ];
 
 /** 自启状态不来自配置文件，而是每次读注册表——任务管理器里禁用也要能反映出来。 */
@@ -302,6 +312,24 @@ onBeforeUnmount(() => {
 
     <section class="section">
       <div class="section-head">
+        <span class="section-title">{{ t("uiAppearance.title") }}</span>
+      </div>
+      <div class="segmented narrow">
+        <button
+          v-for="option in APPEARANCE_OPTIONS"
+          :key="option.value"
+          type="button"
+          :class="{ selected: settings.ui.appearance === option.value }"
+          @click="settings.ui.appearance = option.value"
+        >
+          {{ t(option.label) }}
+        </button>
+      </div>
+      <p class="row-hint">{{ t("uiAppearance.hint") }}</p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
         <span class="section-title">{{ t("system.restoreSection") }}</span>
       </div>
       <div class="lines">
@@ -405,7 +433,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <!-- 恢复默认的影响清单。不能只用一句 confirm：reset() 动五段配置，
+    <!-- 恢复默认的影响清单。不能只用一句 confirm：reset() 动六段配置，
          用户有权在清掉之前看到「哪些自建内容会消失」。 -->
     <Transition name="fade">
       <div v-if="restorePrompt" class="confirm-backdrop" @click.self="restorePrompt = false">
@@ -418,6 +446,7 @@ onBeforeUnmount(() => {
             <li>{{ t("system.restoreScopeSaver") }}</li>
             <li>{{ t("system.restoreScopeStartup") }}</li>
             <li>{{ t("system.restoreScopeLanguage") }}</li>
+            <li>{{ t("system.restoreScopeAppearance") }}</li>
           </ul>
           <p class="confirm-keep">{{ t("system.restoreKeep") }}</p>
           <div class="confirm-actions">
@@ -540,7 +569,7 @@ onBeforeUnmount(() => {
   z-index: 600;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.42);
+  background: var(--ui-scrim);
 }
 
 .confirm {
@@ -549,7 +578,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--ui-divider-strong);
   border-radius: 6px;
   background: var(--ui-surface);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--ui-shadow-dialog);
 }
 
 .confirm strong {

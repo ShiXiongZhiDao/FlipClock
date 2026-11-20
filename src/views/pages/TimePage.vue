@@ -177,7 +177,7 @@ function setLayout(layout: DigitLayout) {
 }
 
 .layout-choice:hover {
-  border-color: #bdbab3;
+  border-color: var(--ui-line-hover);
 }
 
 .layout-choice.active {
@@ -200,8 +200,8 @@ function setLayout(layout: DigitLayout) {
   width: 22px;
   height: 34px;
   border-radius: 3px;
-  background: #37383c;
-  color: #f6f6f4;
+  background: var(--ui-mini-card);
+  color: var(--ui-mini-ink);
   font-family: var(--font-digit);
   font-size: 16px;
   line-height: 1;

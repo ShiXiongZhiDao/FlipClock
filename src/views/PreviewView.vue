@@ -70,7 +70,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #111315;
+  background: var(--ui-preview-backdrop);
 }
 
 .thumb-canvas {

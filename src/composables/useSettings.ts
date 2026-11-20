@@ -2,7 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { reactive, ref, watch } from "vue";
 
-import { trackFeatureToggled } from "../lib/analytics";
+import { trackFeatureToggled, trackUiAppearance } from "../lib/analytics";
+import { applyAppearance } from "../lib/appearance";
 import { cloneJson } from "../lib/clone";
 import { initThemeAssets } from "../lib/theme/assets";
 import { isTauri } from "../lib/env";
@@ -84,21 +85,50 @@ watch(
   { deep: true },
 );
 
-// 语言偏好独立监听：切换界面文字要比 200ms 的落盘防抖更早，
-// 而且托盘重建走的是另一条命令，不跟着 save_settings 走。
-let languageBaseline: string | null = null;
-watch(
+/**
+ * 界面偏好的统一监听。
+ *
+ * 两件事必须一起做：立刻生效（比 200ms 的落盘防抖早），以及**只在值真的偏离
+ * 加载时的值**才记一次埋点。watch 回调在微任务里跑，可能晚于 load() 写基线，
+ * 所以比较的是值而不是布尔标志——否则「加载配置」会被误记成「用户切换」。
+ * 基线用对象包一层：泛型参数没法按引用传递。
+ */
+function watchPreference<T>(
+  read: () => T,
+  apply: (value: T) => void,
+  baseline: { value: T | null },
+  track: (value: T) => void,
+): void {
+  watch(
+    read,
+    (value) => {
+      apply(value);
+      if (baseline.value !== null && value !== baseline.value) {
+        track(value);
+        baseline.value = value;
+      }
+    },
+    { immediate: true },
+  );
+}
+
+// 语言：切换界面文字要立刻生效，托盘重建走另一条命令，不跟 save_settings 走。
+const languageBaseline: { value: Settings["ui"]["language"] | null } = { value: null };
+watchPreference(
   () => settings.ui.language,
-  (language) => {
-    applyLanguage(language);
-    // watch 回调在微任务里跑，可能晚于 load() 里设置基线。只比较值是否真的
-    // 偏离基线，不用布尔标志——否则「加载配置」会被误记成「用户切换语言」。
-    if (languageBaseline !== null && language !== languageBaseline) {
-      trackFeatureToggled("language", language !== "system");
-      languageBaseline = language;
-    }
-  },
-  { immediate: true },
+  applyLanguage,
+  languageBaseline,
+  (language) => trackFeatureToggled("language", language !== "system"),
+);
+
+// 外观：立刻改写 <html> 的 data-appearance（CSS 只认它）。窗口主题不参与——
+// 运行期改它动不了 prefers-color-scheme，见 lib/appearance.ts 的说明。
+const appearanceBaseline: { value: Settings["ui"]["appearance"] | null } = { value: null };
+watchPreference(
+  () => settings.ui.appearance,
+  applyAppearance,
+  appearanceBaseline,
+  trackUiAppearance,
 );
 
 /**
@@ -123,8 +153,14 @@ function applyRemoteAppearance(remote: Settings): void {
 
 function applyRemoteUi(remote: Settings): void {
   const language = remote.ui?.language;
+  const appearance = remote.ui?.appearance;
   settings.ui = {
     language: language === "zh" || language === "en" || language === "system" ? language : "system",
+    // 旧配置没有这个字段。认不出的值也落回 system：跟随系统比替用户钉死浅色保守。
+    appearance:
+      appearance === "light" || appearance === "dark" || appearance === "system"
+        ? appearance
+        : "system",
   };
 }
 
@@ -200,7 +236,8 @@ async function load() {
         loaded.value = true;
         // settings.ui 的赋值已触发 watch，但回调在微任务里才跑。先把基线设成
         // 刚加载进来的值，回调读到相等就不会把「加载配置」误报成用户切换。
-        languageBaseline = settings.ui.language;
+        languageBaseline.value = settings.ui.language;
+        appearanceBaseline.value = settings.ui.appearance;
       } finally {
         endHydration();
       }

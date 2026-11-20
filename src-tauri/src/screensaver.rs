@@ -496,9 +496,9 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, MODE_SETTINGS, WebviewUrl::App("index.html".into()))
         .title("FlipClock")
         .inner_size(width, height)
-        // 只留一个下限，不再锁死上限：编辑主题时要能铺满屏幕看效果。
-        // 「不能最大化」仍然保留——设置页不该有最大化按钮，放大由编辑态自己接管。
-        .min_inner_size(1000.0, 640.0);
+        // ADR-0004 决定 1：固定尺寸 = resizable(false) + min == max。
+        .min_inner_size(width, height)
+        .max_inner_size(width, height);
 
     let builder = match WINDOW_AT.get() {
         Some((x, y)) => builder.position(*x, *y),
@@ -507,12 +507,16 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
 
     let window = builder
         // 自绘标题栏：去掉原生边框，交通灯和拖拽区都在前端。
-        // 代价是没有 Win11 贴靠布局，所以不做最大化按钮；但尺寸不再固定，
-        // 编辑主题时需要把窗口撑到整屏。
+        // 代价是没有 Win11 贴靠布局，所以也不做最大化按钮。
         .decorations(false)
-        .resizable(true)
+        // 尺寸固定：两栏按比例分配（左栏 minmax(336px, .82fr)），一拉伸就会让
+        // 左栏预览与右侧主题墙各自变形，界面的疏密也就不再是设计时的那一套。
+        // 要在整屏下看效果，走「全屏配置」那个独立窗口，不靠把设置页拉大。
+        .resizable(false)
         .maximizable(false)
-        .theme(Some(tauri::Theme::Light))
+        // 不设窗口主题：保持默认的 Auto，WebView2 的 prefers-color-scheme 就一直是
+        // 系统的真实值。显式浅/深由前端的 data-appearance + color-scheme 负责——
+        // 运行期 set_theme 改不动 webview 的配色方案（见 lib/appearance.ts 的说明）。
         // 无边框窗口的原生影子不是 DWM 直接画的，而是 tao 把窗口向外扩 8px、
         // 在 client 之外留出一圈给 DWM 投影。WebView 只覆盖 client，那 8px
         // 就会露出一圈半透明灰边；圆角一裁，四角外侧还多一圈方形投影（虚影）。

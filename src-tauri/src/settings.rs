@@ -54,17 +54,39 @@ impl Default for LanguagePreference {
     }
 }
 
+/// 界面外观偏好：设置窗口外壳的明暗。与钟面主题是两条独立的轴（ADR-0025）。
+///
+/// system 不需要 Rust 去监听系统事件：窗口主题设成 None 时 WebView2 的
+/// preferred color scheme 就是 Auto，`prefers-color-scheme` 自己会跟着系统走，
+/// 前端只负责把它归并成 light/dark 两个值。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AppearancePreference {
+    System,
+    Light,
+    Dark,
+}
+
+impl Default for AppearancePreference {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     #[serde(default)]
     pub language: LanguagePreference,
+    #[serde(default)]
+    pub appearance: AppearancePreference,
 }
 
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
             language: LanguagePreference::default(),
+            appearance: AppearancePreference::default(),
         }
     }
 }
@@ -775,6 +797,24 @@ mod tests {
         let raw = serde_json::json!({ "schemaVersion": 1 });
         let settings: Settings = serde_json::from_value(raw).expect("缺 ui 段应能反序列化");
         assert_eq!(settings.ui.language, LanguagePreference::System);
+    }
+
+    #[test]
+    fn ui_appearance_round_trips_and_defaults_to_system() {
+        // 新增枚举字段必须能存能读：漏了 Default 或 serde 属性，表现就是
+        // 「选完深色、重启静默回默认」——界面上看不出任何错误。
+        let mut s = Settings::default();
+        assert_eq!(s.ui.appearance, AppearancePreference::System);
+        s.ui.appearance = AppearancePreference::Dark;
+        let json = serde_json::to_string(&s).expect("序列化");
+        assert!(json.contains("\"appearance\":\"dark\""), "{json}");
+        let back: Settings = serde_json::from_str(&json).expect("反序列化");
+        assert_eq!(back.ui.appearance, AppearancePreference::Dark);
+
+        // 旧配置没有这个字段：按 system 运行，不报错也不写回。
+        let raw = serde_json::json!({ "ui": { "language": "en" } });
+        let ui: UiSettings = section(&raw, "ui").unwrap_or_default();
+        assert_eq!(ui.appearance, AppearancePreference::System);
     }
 
     #[test]

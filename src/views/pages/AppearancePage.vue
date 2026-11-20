@@ -321,8 +321,8 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   padding: 7px 13px;
   font-size: 11px;
   border-radius: 4px;
-  background: #1b1b1a;
-  color: #fff;
+  background: var(--ui-toast-bg);
+  color: var(--ui-toast-ink);
 }
 
 .appearance {
@@ -373,7 +373,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
 
 /* 悬停放大时加一层浅投影，让「浮起」有落点。 */
 .theme-cell:hover .theme-sample {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--ui-shadow-float);
 }
 
 /* 选中卡悬停：外阴影不能冲掉那圈墨环，两层合并。 */
@@ -381,13 +381,13 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   box-shadow:
     0 0 0 2px var(--ui-surface),
     0 0 0 4px var(--ui-accent),
-    0 4px 14px rgba(0, 0, 0, 0.12);
+    var(--ui-shadow-float);
 }
 
 /* 新建卡没有 .theme-pick（它的框就是 .new-stage），沿用同一套悬停反馈。 */
 .theme-cell.new-theme:hover .new-stage {
   border-color: var(--ui-accent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--ui-shadow-float);
 }
 
 /* 标题与右下角的操作条同一行：右侧留出三个按钮的位置，文字才不会压到
@@ -443,15 +443,15 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(18, 18, 16, 0.6);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
-  color: #fff;
+  background: var(--ui-on-theme);
+  box-shadow: inset 0 0 0 1px var(--ui-on-theme-ring);
+  color: var(--ui-on-theme-ink);
   transition: background 0.12s ease;
 }
 
 .theme-actions .icon:hover {
-  background: rgba(18, 18, 16, 0.86);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.52);
+  background: var(--ui-on-theme-hover);
+  box-shadow: inset 0 0 0 1px var(--ui-on-theme-ring-hover);
 }
 
 .theme-actions .icon.danger:hover {
@@ -477,7 +477,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   padding: 6px;
   border: 0;
   border-radius: 4px;
-  /* 用第三层灰（#eceae6）而不是第二层（#f2f1ee）：后者在白底与抽屉的渐变底上
+  /* 用第三层灰（--ui-surface-3）而不是第二层（--ui-surface-2）：后者在白底与抽屉的渐变底上
      几乎看不出来，一整块料就成了"浮着的两个字"。 */
   background: var(--ui-surface-3);
   text-align: left;
@@ -551,7 +551,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
 }
 
 .font-choice:hover {
-  border-color: #bdbab3;
+  border-color: var(--ui-line-hover);
   color: var(--ui-text-secondary);
 }
 

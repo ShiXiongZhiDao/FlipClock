@@ -34,7 +34,7 @@ button {
 /* 键盘焦点用墨色细环，不用系统蓝：这个界面里没有第二种色相，
    蓝环会像上一个版本留下的残留。 */
 :focus-visible {
-  outline: 2px solid rgba(27, 27, 26, 0.3);
+  outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }
 
