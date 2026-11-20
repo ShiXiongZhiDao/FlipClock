@@ -347,10 +347,138 @@ pub fn delete_theme_dir(app: AppHandle, theme_id: String) -> Result<(), String> 
     Ok(())
 }
 
+/* ------------------------------- 导入字体（ADR-0026） ------------------------------ */
+
+const FONT_FILE_MAX_MB: u32 = 32;
+const FONT_FILE_MAX_BYTES: u64 = FONT_FILE_MAX_MB as u64 * 1024 * 1024;
+
+#[tauri::command]
+pub fn fonts_dir_path(app: AppHandle) -> Result<String, String> {
+    let dir = settings::fonts_dir(&app)?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// 只认文件头，不认扩展名：改名后的 .exe 不会因为后缀是 .ttf 就混进来。
+fn font_format(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x00, 0x01, 0x00, 0x00]) || bytes.starts_with(b"true") {
+        Some("ttf")
+    } else if bytes.starts_with(b"OTTO") {
+        Some("otf")
+    } else if bytes.starts_with(b"wOFF") {
+        Some("woff")
+    } else if bytes.starts_with(b"wOF2") {
+        Some("woff2")
+    } else {
+        None
+    }
+}
+
+/// 只用于导入去重，不是安全哈希；固定实现，跨版本稳定即可。
+fn fnv1a_hex(bytes: &[u8]) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+fn default_font_name(source: &std::path::Path) -> String {
+    let name = source
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("字体");
+    name.chars().take(settings::FONT_NAME_MAX_CHARS).collect()
+}
+
+/// 把用户选中的字体复制进字体库目录，返回文件名 / 内容 hash / 默认显示名。
+#[tauri::command]
+pub fn import_font(
+    app: AppHandle,
+    font_id: String,
+    source_path: String,
+) -> Result<settings::CustomFont, String> {
+    if !settings::is_safe_font_id(&font_id) {
+        return Err(AppError::InvalidFontId { detail: font_id }.into());
+    }
+
+    let source = std::path::Path::new(&source_path);
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .ok_or_else(|| AppError::FontUnsupported {
+            detail: String::from("no-extension"),
+        })?;
+    if !matches!(extension.as_str(), "ttf" | "otf" | "woff" | "woff2") {
+        return Err(AppError::FontUnsupported { detail: extension }.into());
+    }
+
+    let meta = std::fs::metadata(source).map_err(|error| AppError::FontUnsupported {
+        detail: error.to_string(),
+    })?;
+    if meta.len() > FONT_FILE_MAX_BYTES {
+        return Err(AppError::FontTooLarge {
+            limit_mb: FONT_FILE_MAX_MB,
+        }
+        .into());
+    }
+    if meta.len() < 12 {
+        return Err(AppError::FontUnsupported {
+            detail: String::from("too-short"),
+        }
+        .into());
+    }
+
+    let bytes = std::fs::read(source).map_err(|error| AppError::FontUnsupported {
+        detail: error.to_string(),
+    })?;
+    let format = font_format(&bytes).ok_or_else(|| AppError::FontUnsupported {
+        detail: String::from("magic"),
+    })?;
+
+    let dir = settings::fonts_dir(&app)?;
+    let file = format!("{font_id}.{format}");
+    let destination = dir.join(&file);
+    if destination.exists() {
+        return Err(AppError::FontUnsupported {
+            detail: String::from("already-exists"),
+        }
+        .into());
+    }
+    std::fs::write(&destination, &bytes).map_err(|error| AppError::FontCopyFailed {
+        detail: error.to_string(),
+    })?;
+
+    Ok(settings::CustomFont {
+        id: font_id,
+        name: default_font_name(source),
+        file,
+        hash: fnv1a_hex(&bytes),
+    })
+}
+
+/// 删除一款导入字体的文件。配置条目的删除由前端负责；文件不存在时视为成功。
+#[tauri::command]
+pub fn remove_font(app: AppHandle, font_id: String, filename: String) -> Result<(), String> {
+    if !settings::is_font_file_for_id(&font_id, &filename) {
+        return Err(AppError::FontUnsupported { detail: filename }.into());
+    }
+    let path = settings::fonts_dir(&app)?.join(&filename);
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|error| AppError::FontCopyFailed {
+            detail: error.to_string(),
+        })?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::{DigitFont, DigitLayout};
+    use crate::settings::DigitLayout;
 
     /// 前端发来的 patch 形状是手写 JSON，字段名或枚举值错一个就会静默回默认值，
     /// 所以这里把线上的实际载荷形态钉住。
@@ -359,6 +487,9 @@ mod tests {
         let raw = serde_json::json!({
             "appearance": {
                 "theme": "classic-dark",
+                "fonts": [
+                    { "id": "custom-a", "name": "测试字体", "file": "custom-a.ttf", "hash": "abc123" }
+                ],
                 "profiles": {
                     "classic-dark": {
                         "format": "12h",
@@ -383,10 +514,28 @@ mod tests {
         let profile = &patch.appearance.profiles["classic-dark"];
         assert_eq!(profile.format, crate::settings::TimeFormat::H12);
         assert_eq!(profile.digit_layout, DigitLayout::PerPair);
-        assert_eq!(profile.font, DigitFont::Bahnschrift);
+        assert_eq!(profile.font, "bahnschrift");
+        assert_eq!(patch.appearance.fonts.len(), 1);
+        assert_eq!(patch.appearance.fonts[0].file, "custom-a.ttf");
         assert!(profile.show_colon);
         assert!(!patch.system.close_to_tray);
         assert_eq!(patch.ui.language, crate::settings::LanguagePreference::System);
+    }
+
+    #[test]
+    fn font_format_uses_magic_bytes_not_the_extension() {
+        assert_eq!(font_format(&[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Some("ttf"));
+        assert_eq!(font_format(b"OTTO............"), Some("otf"));
+        assert_eq!(font_format(b"wOFF............"), Some("woff"));
+        assert_eq!(font_format(b"wOF2............"), Some("woff2"));
+        assert_eq!(font_format(b"ttcf............"), None);
+        assert_eq!(font_format(b"not a font....."), None);
+    }
+
+    #[test]
+    fn fnv_hash_is_stable() {
+        // 空输入就是 FNV-1a 的 offset basis；去重口径跨版本不能漂。
+        assert_eq!(fnv1a_hex(b""), "cbf29ce484222325");
     }
 
     #[test]

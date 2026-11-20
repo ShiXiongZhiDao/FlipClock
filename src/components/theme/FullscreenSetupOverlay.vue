@@ -5,10 +5,12 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import FlipClock from "../clock/FlipClock.vue";
+import FontPicker from "./FontPicker.vue";
 import { useClock } from "../../composables/useClock";
 import { previewScaleOf } from "../../composables/useClockScale";
 import { useToast } from "../../composables/useToast";
 import { playFlipSound } from "../../lib/flipSound";
+import { setFontLibrary } from "../../lib/fonts";
 import { applyLanguage, errorText, previewLanguage, t, type MessageKey } from "../../lib/i18n";
 import { rangeFill } from "../../lib/rangeFill";
 import { settingsPatchOf } from "../../lib/settingsPatch";
@@ -39,12 +41,10 @@ import {
   CLOCK_SCALE_MIN,
   CUSTOM_THEME_LIMIT,
   DEFAULT_CLOCK_PROFILE,
-  FONT_LABELS,
   OPACITY_MAX,
   PART_OPACITY_MIN,
   THEME_NAME_MAX,
   type BackgroundFit,
-  type DigitFont,
   type Settings,
   type ThemeMaterial,
   type ThemeSpec,
@@ -60,7 +60,6 @@ const MATERIAL_LABELS: Record<ThemeMaterial, MessageKey> = {
   soft: "appearance.material.soft",
 };
 const FITS: BackgroundFit[] = ["cover", "tile"];
-const FONTS: DigitFont[] = ["bebas", "bahnschrift", "system"];
 const TABS: StudioTab[] = ["theme", "clock", "sound"];
 const SCALE_MIN = Math.round(CLOCK_SCALE_MIN * 100);
 const SCALE_MAX = Math.round(CLOCK_SCALE_MAX * 100);
@@ -80,6 +79,13 @@ const SWATCHES = [
 
 const draft = computed(() => studioDraft.value);
 const profile = computed(() => (draft.value ? profileOf(draft.value) : DEFAULT_CLOCK_PROFILE));
+
+// 这个窗口不加载 useSettings；字体管理器从草稿快照取字体库，选中导入字体时才能加载。
+watch(
+  () => draft.value?.appearance.fonts,
+  (fonts) => setFontLibrary(fonts ?? []),
+  { immediate: true, deep: true },
+);
 
 /** 主题卡预览要画「这张卡自己的钟面」，不能借用当前主题的配置。 */
 function cardProfile(theme: ThemeSpec) {
@@ -975,17 +981,12 @@ onBeforeUnmount(() => {
 
             <div class="group">
               <div class="group-title">{{ t("appearance.fontLabel") }}</div>
-              <div class="segmented stretch">
-                <button
-                  v-for="font in FONTS"
-                  :key="font"
-                  type="button"
-                  :class="{ selected: profile.font === font }"
-                  @click="profile.font = font"
-                >
-                  {{ t(FONT_LABELS[font]) }}
-                </button>
-              </div>
+              <FontPicker
+                :model-value="profile.font"
+                :fonts="draft?.appearance.fonts ?? []"
+                @update:model-value="profile.font = $event"
+                @load-failed="notify(t('appearance.fontLoadFailed'))"
+              />
             </div>
 
             <div class="group">

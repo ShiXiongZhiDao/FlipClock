@@ -1,28 +1,32 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { computed } from "vue";
 
 import FlipClock from "../../components/clock/FlipClock.vue";
+import FontPicker from "../../components/theme/FontPicker.vue";
 import { useClock } from "../../composables/useClock";
 import { previewScaleOf, useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
 import { useStudioLauncher } from "../../composables/useStudioLauncher";
 import { useToast } from "../../composables/useToast";
 import { useTheme } from "../../composables/useTheme";
-import { t } from "../../lib/i18n";
+import { isTauri } from "../../lib/env";
+import { ensureFontLoaded, forgetFont, setFontLibrary, uniqueFontName } from "../../lib/fonts";
+import { errorText, locale, t } from "../../lib/i18n";
 import { rangeFill } from "../../lib/rangeFill";
 import { forgetThemeAssets, themeAssetUrl } from "../../lib/theme/assets";
 import { blankTheme, cloneTheme, isBuiltinThemeId } from "../../lib/theme/presets";
-import { profileFor } from "../../lib/theme/profile";
+import { profileFor, themeIdsUsingFont } from "../../lib/theme/profile";
 import { themeLabel } from "../../lib/theme/labels";
 import { uniqueThemeName, fitThemeStem } from "../../lib/theme/names";
 import { swatchStyle } from "../../lib/theme/swatch";
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
+  CUSTOM_FONT_LIMIT,
   CUSTOM_THEME_LIMIT,
-  FONT_LABELS,
-  type DigitFont,
+  type CustomFont,
   type ThemeSpec,
 } from "../../types/settings";
 
@@ -37,7 +41,7 @@ const { scalePercent, SCALE_MIN, SCALE_MAX, SCALE_STEP, FIT_PERCENT } = useClock
  *  这里只需要一条「已达上限 / 已删除」的短反馈。 */
 const { toast, notify } = useToast(2600);
 
-const FONTS: DigitFont[] = ["bebas", "bahnschrift", "system"];
+const canImportFonts = isTauri();
 
 /** 主题卡画的是「这个主题自己的钟面」，不能借用当前主题的配置。 */
 function cardProfile(theme: ThemeSpec) {
@@ -74,6 +78,136 @@ function uniqueName(base: string): string {
     base,
     settings.appearance.customThemes.map((theme) => theme.name),
   );
+}
+
+/* --------------------------------- 字体库 -------------------------------- */
+
+async function removeFontFile(font: Pick<CustomFont, "id" | "file">): Promise<void> {
+  await invoke("remove_font", { fontId: font.id, filename: font.file }).catch(
+    (error) => {
+      console.warn("remove font file failed", font.id, error);
+    },
+  );
+}
+
+function fontLimitReached(): boolean {
+  if (settings.appearance.fonts.length < CUSTOM_FONT_LIMIT) return false;
+  notify(t("appearance.fontLimit", { limit: CUSTOM_FONT_LIMIT }));
+  return true;
+}
+
+async function importOneFont(path: string): Promise<void> {
+  const id = `custom-${crypto.randomUUID()}`;
+  try {
+    const imported = await invoke<CustomFont>("import_font", {
+      fontId: id,
+      sourcePath: path,
+    });
+    const duplicate = settings.appearance.fonts.find(
+      (font) => font.hash === imported.hash,
+    );
+    if (duplicate) {
+      await removeFontFile(imported);
+      profile.value.font = duplicate.id;
+      notify(t("appearance.fontDuplicate", { name: duplicate.name }));
+      return;
+    }
+
+    const entry: CustomFont = {
+      ...imported,
+      name: uniqueFontName(
+        imported.name,
+        settings.appearance.fonts.map((font) => font.name),
+        t("appearance.fontDefaultName"),
+      ),
+    };
+    // 先放进库再加载：字体管理器从设置里按 id 找文件；加载失败整条撤回。
+    settings.appearance.fonts.push(entry);
+    setFontLibrary(settings.appearance.fonts);
+    if (!(await ensureFontLoaded(entry))) {
+      settings.appearance.fonts = settings.appearance.fonts.filter(
+        (font) => font.id !== entry.id,
+      );
+      forgetFont(entry.id);
+      await removeFontFile(entry);
+      notify(t("appearance.fontLoadFailed"));
+      return;
+    }
+    profile.value.font = entry.id;
+    notify(t("appearance.fontImported", { name: entry.name }));
+  } catch (error) {
+    notify(errorText(error));
+  }
+}
+
+async function importFonts(): Promise<void> {
+  if (!canImportFonts || fontLimitReached()) return;
+
+  let selected: string | string[] | null;
+  try {
+    selected = await open({
+      multiple: true,
+      filters: [
+        {
+          name: t("appearance.fontFilter"),
+          extensions: ["ttf", "otf", "woff", "woff2"],
+        },
+      ],
+    });
+  } catch (error) {
+    notify(errorText(error));
+    return;
+  }
+  if (!selected) return;
+
+  for (const path of Array.isArray(selected) ? selected : [selected]) {
+    if (fontLimitReached()) break;
+    await importOneFont(path);
+  }
+}
+
+function renameFont(font: CustomFont): void {
+  const next = window.prompt(t("appearance.fontRenamePrompt"), font.name);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (!trimmed) {
+    notify(t("appearance.fontRenameEmpty"));
+    return;
+  }
+  font.name = uniqueFontName(
+    trimmed,
+    settings.appearance.fonts
+      .filter((item) => item.id !== font.id)
+      .map((item) => item.name),
+    t("appearance.fontDefaultName"),
+  );
+}
+
+async function removeFont(font: CustomFont): Promise<void> {
+  const affectedIds = themeIdsUsingFont(settings, font.id);
+  const affected = affectedIds
+    .map((themeId) => allThemes.value.find((theme) => theme.id === themeId))
+    .filter((theme): theme is ThemeSpec => !!theme)
+    .map((theme) => themeLabel(theme));
+  const separator = locale.value === "zh" ? "、" : ", ";
+  const message = affected.length
+    ? t("appearance.fontDeleteConfirm", {
+        name: font.name,
+        count: affected.length,
+        themes: affected.join(separator),
+      })
+    : t("appearance.fontDeleteConfirmUnused", { name: font.name });
+  if (!window.confirm(message)) return;
+
+  for (const item of Object.values(settings.appearance.profiles)) {
+    if (item.font === font.id) item.font = "bebas";
+  }
+  settings.appearance.fonts = settings.appearance.fonts.filter(
+    (item) => item.id !== font.id,
+  );
+  forgetFont(font.id);
+  await removeFontFile(font);
+  notify(t("appearance.fontRemoved", { name: font.name }));
 }
 
 function openFailure(error: unknown): void {
@@ -245,21 +379,26 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
 
       <div class="columns">
         <div class="col">
-          <div class="section-title">{{ t("appearance.fontLabel") }}</div>
-          <div class="font-options">
+          <div class="font-head">
+            <div class="section-title">{{ t("appearance.fontLabel") }}</div>
             <button
-              v-for="font in FONTS"
-              :key="font"
+              v-if="canImportFonts"
               type="button"
-              class="font-choice"
-              :class="{ active: profile.font === font }"
-              :data-clock-font="font"
-              @click="profile.font = font"
+              class="font-import"
+              @click="importFonts"
             >
-              <span class="font-sample">10:24</span>
-              <small>{{ t(FONT_LABELS[font]) }}</small>
+              {{ t("appearance.fontImport") }}
             </button>
           </div>
+          <FontPicker
+            :model-value="profile.font"
+            :fonts="settings.appearance.fonts"
+            manage
+            @update:model-value="profile.font = $event"
+            @load-failed="notify(t('appearance.fontLoadFailed'))"
+            @rename="renameFont"
+            @remove="removeFont"
+          />
         </div>
 
         <div class="col">
@@ -531,52 +670,25 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   min-width: 0;
 }
 
-.font-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.font-choice {
+.font-head {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 3px 5px;
-  border: 1px solid var(--ui-divider);
-  border-radius: 4px;
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
-  transition: border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.font-choice:hover {
-  border-color: var(--ui-line-hover);
-  color: var(--ui-text-secondary);
+.font-import {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ui-accent);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
 }
 
-.font-choice.active {
-  border-color: var(--ui-accent);
-  box-shadow: inset 0 0 0 1px var(--ui-accent);
-  color: var(--ui-text);
-}
-
-.font-sample {
-  font-family: var(--font-clock);
-  font-weight: var(--digit-weight, 400);
-  letter-spacing: var(--digit-spacing, -0.02em);
-  font-size: 20px;
-  line-height: 1.15;
-  color: var(--ui-text-secondary);
-}
-
-.font-choice.active .font-sample {
-  color: var(--ui-text);
-}
-
-.font-choice small {
-  font-size: 9px;
-  white-space: nowrap;
+.font-import:hover {
+  text-decoration: underline;
 }
 
 .range-row {

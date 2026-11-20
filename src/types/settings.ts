@@ -101,8 +101,25 @@ export type NoArgMode = "settings" | "fullscreen";
 /** 每张翻页卡承载几位数字。per-digit = 一位一卡，per-pair = 两位一卡（方卡）。 */
 export type DigitLayout = "per-digit" | "per-pair";
 
-/** 数字字体。三款全部系统自带或随包，不引入新资产。 */
+/** 内置钟面字体。三款全部系统自带或随包，不引入新资产。 */
 export type DigitFont = "bebas" | "bahnschrift" | "system";
+
+/** 导入字体库上限（ADR-0026）。界面靠懒加载控制内存。 */
+export const CUSTOM_FONT_LIMIT = 32;
+export const FONT_NAME_MAX = 32;
+
+/** 全局字体库里的一款导入字体；文件在 `<app_config>/fonts/<file>`。 */
+export interface CustomFont {
+  id: string;
+  name: string;
+  /** 文件名，不是路径。 */
+  file: string;
+  /** 导入去重用的内容 hash，不参与渲染。 */
+  hash: string;
+}
+
+/** 内置 id 与导入 id 都是字符串；只有内置 id 会命中注册表。 */
+export type FontId = string;
 
 /** 时钟缩放比例：只作用于全屏时钟与屏保；左栏预览按阻尼系数演示，见 useClockScale。 */
 export const CLOCK_SCALE_MIN = 0.5;
@@ -147,7 +164,8 @@ export interface ClockProfile {
   showSeconds: boolean;
   showColon: boolean;
   digitLayout: DigitLayout;
-  font: DigitFont;
+  /** 钟面字体 id：内置 id，或字体库里的 `custom-<uuid>`（ADR-0026）。 */
+  font: FontId;
   clockScale: number;
   brightness: number;
   sound: { enabled: boolean; volume: number };
@@ -173,6 +191,8 @@ export interface Settings {
     theme: ThemeId;
     /** 用户自定义的主题（ADR-0020）。上限 CUSTOM_THEME_LIMIT。 */
     customThemes: ThemeSpec[];
+    /** 全局导入字体库（ADR-0026）。 */
+    fonts: CustomFont[];
     /** 每个主题自己的钟面配置（ADR-0022），按主题 id 索引。 */
     profiles: Record<ThemeId, ClockProfile>;
   };
@@ -214,12 +234,6 @@ export const THEME_LABELS: Record<BuiltinThemeId, import("../lib/i18n").MessageK
   "black-label": "appearance.theme.blackLabel",
 };
 
-export const FONT_LABELS: Record<DigitFont, import("../lib/i18n").MessageKey> = {
-  bebas: "appearance.font.bebas",
-  bahnschrift: "appearance.font.bahnschrift",
-  system: "appearance.font.systemDefault",
-};
-
 export function defaultSettings(): Settings {
   // 五个内置主题出厂各带一份默认钟面配置，与 Rust 侧 default_profiles 对齐。
   const profiles: Record<string, ClockProfile> = {};
@@ -227,10 +241,11 @@ export function defaultSettings(): Settings {
     profiles[id] = { ...DEFAULT_CLOCK_PROFILE, sound: { ...DEFAULT_CLOCK_PROFILE.sound } };
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     appearance: {
       theme: "classic-dark",
       customThemes: [],
+      fonts: [],
       profiles,
     },
     screensaver: { monitorMode: "primary" },

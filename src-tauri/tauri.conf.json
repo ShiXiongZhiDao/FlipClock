@@ -15,7 +15,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPCONFIG/themes/**"]
+        "scope": ["$APPCONFIG/themes/**", "$APPCONFIG/fonts/**"]
       }
     }
   },
@@ -36,6 +36,7 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
+        "startMenuFolder": "ShiXiongZhiDao",
         "installerHooks": "./windows/hooks.nsh",
         "installerIcon": "icons/icon.ico",
         "languages": ["SimpChinese", "English"],

@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::errors::AppError;
 
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// 时钟缩放比例的唯一边界；只作用于全屏时钟与屏保。
 /// 上限远大于「刚好铺满屏幕」的约 1.57 倍，超出部分会被屏幕裁切，这是用户的选择。
@@ -137,6 +137,9 @@ pub struct Appearance {
     /// 用户自定义主题（ADR-0020）。内置主题是预设，不存这里。
     #[serde(default)]
     pub custom_themes: Vec<ThemeSpec>,
+    /// 全局导入字体库（ADR-0026）。字体文件只存一份，按字体 id 被各主题引用。
+    #[serde(default)]
+    pub fonts: Vec<CustomFont>,
     /// 每个主题自己的钟面配置（ADR-0022）：时间格式、排布、字体、缩放、
     /// 亮度、翻页音。内置与自定义主题共用这一张表，按主题 id 索引。
     #[serde(default = "default_profiles")]
@@ -148,6 +151,7 @@ impl Default for Appearance {
         Self {
             theme: default_theme_id(),
             custom_themes: Vec::new(),
+            fonts: Vec::new(),
             profiles: default_profiles(),
         }
     }
@@ -165,22 +169,21 @@ fn default_brightness() -> f32 {
     1.0
 }
 
-/// 数字字体。三款全部是系统自带或已随包，不引入新资产。
+/// 全局字体库里的一款导入字体（ADR-0026）。
 ///
-/// 字宽差异很大（Bebas 极窄、Segoe UI 接近方形），所以前端按
-/// 「字体 × 数字排布」两套字号比例分别标定，见 `src/styles/fonts.css`。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum DigitFont {
-    Bebas,
-    Bahnschrift,
-    System,
-}
-
-impl Default for DigitFont {
-    fn default() -> Self {
-        Self::Bebas
-    }
+/// 文件在 `<app_config_dir>/fonts/<id>.<ext>`；`file` 只存文件名，不存路径。
+/// `hash` 用于导入时去重，不参与渲染。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomFont {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub file: String,
+    #[serde(default)]
+    pub hash: String,
 }
 
 /// 每张翻页卡承载几位数字。
@@ -247,8 +250,9 @@ pub struct ClockProfile {
     pub show_colon: bool,
     #[serde(default)]
     pub digit_layout: DigitLayout,
-    #[serde(default)]
-    pub font: DigitFont,
+    /// 钟面字体 id：内置 id，或字体库里的 `custom-<uuid>`（ADR-0026）。
+    #[serde(default = "default_font_id")]
+    pub font: String,
     #[serde(default = "default_clock_scale")]
     pub clock_scale: f32,
     #[serde(default = "default_brightness")]
@@ -266,7 +270,7 @@ impl Default for ClockProfile {
             show_seconds: false,
             show_colon: false,
             digit_layout: DigitLayout::PerPair,
-            font: DigitFont::Bebas,
+            font: default_font_id(),
             clock_scale: default_clock_scale(),
             brightness: default_brightness(),
             sound: SoundSettings::default(),
@@ -288,6 +292,12 @@ impl ClockProfile {
 /// 自定义主题上限。超过要删旧的——这是为了界面可管理，不是技术限制。
 pub const CUSTOM_THEME_LIMIT: usize = 36;
 pub const THEME_NAME_MAX_CHARS: usize = 16;
+/// 导入字体上限（ADR-0026）。用户明确从 16 提到 32；界面靠懒加载控制内存。
+pub const CUSTOM_FONT_LIMIT: usize = 32;
+pub const FONT_NAME_MAX_CHARS: usize = 32;
+/// 内置钟面字体 id。前端 `src/lib/fontRegistry.ts` 里是同一组字符串；
+/// 这是跨语言契约，改名要两边一起改。
+pub const BUILTIN_FONT_IDS: [&str; 3] = ["bebas", "bahnschrift", "system"];
 /// 不透明度下限。0 表示「完全不要这个部件」：卡片为 0 只剩数字，
 /// 分割线为 0 等于去掉冒号。全透明时翻页两层叠加都不可见，不存在加深问题。
 pub const CARD_OPACITY_MIN: f32 = 0.0;
@@ -305,6 +315,10 @@ pub const BUILTIN_THEME_IDS: [&str; 5] = [
 
 fn default_theme_id() -> String {
     String::from("classic-dark")
+}
+
+fn default_font_id() -> String {
+    String::from("bebas")
 }
 
 fn default_opacity() -> f32 {
@@ -430,14 +444,51 @@ fn clamp_opacity(value: f32, min: f32) -> f32 {
     value.clamp(min, 100.0)
 }
 
-/// 主题 id 会被拼进文件路径，必须只允许小写字母、数字与连字符：
-/// 这条同时挡住 `..`、斜杠与盘符。导入图片与读配置都走同一份判据。
+/// 主题 / 字体 id 会被拼进文件路径，必须只允许小写字母、数字与连字符：
+/// 这条同时挡住 `..`、斜杠与盘符。导入图片、导入字体与读配置都走同一份判据。
 pub fn is_safe_theme_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// 导入字体 id 必须是 `custom-` 前缀；内置 id 不能被字体库占用。
+pub fn is_safe_font_id(id: &str) -> bool {
+    id.starts_with("custom-") && is_safe_theme_id(id)
+}
+
+/// 字体文件名白名单：`<id>.<ext>`，扩展名只允许 webview 能加载的四种。
+pub fn is_font_name(value: &str) -> bool {
+    let Some((stem, ext)) = value.rsplit_once('.') else {
+        return false;
+    };
+    matches!(ext, "ttf" | "otf" | "woff" | "woff2")
+        && !stem.is_empty()
+        && stem.len() <= 64
+        && stem
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// 字体文件必须属于它自己的 id，防止手改配置把 A 字体指向 B 文件。
+pub fn is_font_file_for_id(id: &str, file: &str) -> bool {
+    is_safe_font_id(id)
+        && is_font_name(file)
+        && file
+            .strip_prefix(id)
+            .map(|rest| rest.starts_with('.'))
+            .unwrap_or(false)
+}
+
+fn font_is_valid(font: &CustomFont) -> bool {
+    let name = font.name.trim();
+    is_font_file_for_id(&font.id, &font.file)
+        && !name.is_empty()
+        && name.chars().count() <= FONT_NAME_MAX_CHARS
+        && font.hash.chars().all(|c| c.is_ascii_hexdigit())
+        && font.hash.len() <= 64
 }
 
 /// 主题是否完整可用。不合法就整条丢弃——静默修补出一个"看起来能用但已经变形"
@@ -480,10 +531,10 @@ fn theme_is_valid(theme: &ThemeSpec) -> bool {
 
 /// 给重名主题加序号，并保证名字仍不超过上限——超长的名字下一轮会被
 /// `theme_is_valid` 当成非法主题整条丢掉，等于用「改名」换「丢数据」。
-fn numbered_name(base: &str, taken: &[String]) -> String {
+fn numbered_name_with_limit(base: &str, taken: &[String], limit: usize) -> String {
     for index in 2..1000 {
         let suffix = format!(" {index}");
-        let keep = THEME_NAME_MAX_CHARS.saturating_sub(suffix.chars().count());
+        let keep = limit.saturating_sub(suffix.chars().count());
         let stem: String = base.chars().take(keep).collect();
         let candidate = format!("{stem}{suffix}");
         if !taken.iter().any(|name| name == &candidate) {
@@ -493,8 +544,51 @@ fn numbered_name(base: &str, taken: &[String]) -> String {
     base.to_string()
 }
 
+fn numbered_name(base: &str, taken: &[String]) -> String {
+    numbered_name_with_limit(base, taken, THEME_NAME_MAX_CHARS)
+}
+
+/// 字体重名同样加序号；上限与主题不同（32 字符）。
+fn numbered_font_name(base: &str, taken: &[String]) -> String {
+    numbered_name_with_limit(base, taken, FONT_NAME_MAX_CHARS)
+}
+
 /// 把外观段收敛到合法状态：截断数量、丢弃非法主题、clamp 不透明度、修正悬空 id。
 pub fn normalize_appearance(appearance: &mut Appearance) {
+    // 字体库先收敛：名字 trim / 截断后，再校验 id、文件名与去重。
+    // 名字为空时退回 id，避免界面上出现一条看不见的字体。
+    for font in &mut appearance.fonts {
+        font.name = font.name.trim().to_string();
+        if font.name.is_empty() {
+            font.name = font.id.clone();
+        }
+        font.name = font.name.chars().take(FONT_NAME_MAX_CHARS).collect();
+        font.hash = font.hash.trim().to_ascii_lowercase();
+    }
+    let mut seen_font_ids: Vec<String> = Vec::new();
+    let mut seen_font_files: Vec<String> = Vec::new();
+    appearance.fonts.retain(|font| {
+        if !font_is_valid(font)
+            || seen_font_ids.contains(&font.id)
+            || seen_font_files.contains(&font.file)
+        {
+            eprintln!("FlipClock: 丢弃非法字体 {:?}", font.id);
+            return false;
+        }
+        seen_font_ids.push(font.id.clone());
+        seen_font_files.push(font.file.clone());
+        true
+    });
+    appearance.fonts.truncate(CUSTOM_FONT_LIMIT);
+
+    let mut font_names: Vec<String> = Vec::new();
+    for font in &mut appearance.fonts {
+        if font_names.iter().any(|name| name == &font.name) {
+            font.name = numbered_font_name(&font.name, &font_names);
+        }
+        font_names.push(font.name.clone());
+    }
+
     let mut seen: Vec<String> = Vec::new();
     appearance.custom_themes.retain(|theme| {
         // 内置 id 不能出现在自定义列表里，否则同一个 id 会有两份定义。
@@ -539,7 +633,16 @@ pub fn normalize_appearance(appearance: &mut Appearance) {
     for id in &known_ids {
         appearance.profiles.entry(id.clone()).or_default();
     }
+    let mut known_fonts: Vec<String> = BUILTIN_FONT_IDS
+        .iter()
+        .map(|id| (*id).to_string())
+        .collect();
+    known_fonts.extend(appearance.fonts.iter().map(|font| font.id.clone()));
     for profile in appearance.profiles.values_mut() {
+        if !known_fonts.iter().any(|id| id == &profile.font) {
+            eprintln!("FlipClock: 字体 {:?} 不存在，回退到 bebas", profile.font);
+            profile.font = default_font_id();
+        }
         profile.clamp();
     }
 
@@ -676,6 +779,19 @@ pub fn themes_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(dir)
 }
 
+/// 导入字体根目录。与 settings.json、themes/ 并列；备份配置时一起带走。
+pub fn fonts_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| AppError::ConfigDirUnavailable)?
+        .join("fonts");
+    fs::create_dir_all(&dir).map_err(|error| AppError::FontDirUnavailable {
+        detail: error.to_string(),
+    })?;
+    Ok(dir)
+}
+
 /// 读取配置。任何一段损坏都只回退那一段，不拖垮整份配置。
 pub fn load(app: &AppHandle) -> Settings {
     let Some(path) = config_path(app) else {
@@ -763,11 +879,12 @@ mod tests {
         let s = Settings::default();
         assert_eq!(s.appearance.theme, "classic-dark");
         assert!(s.appearance.custom_themes.is_empty());
+        assert!(s.appearance.fonts.is_empty());
         let profile = &s.appearance.profiles["classic-dark"];
         assert!((profile.clock_scale - 2.25).abs() < f32::EPSILON);
         assert_eq!(profile.digit_layout, DigitLayout::PerPair);
         assert!((profile.brightness - 1.0).abs() < f32::EPSILON);
-        assert_eq!(profile.font, DigitFont::Bebas);
+        assert_eq!(profile.font, "bebas");
         assert!(profile.sound.enabled);
         assert!((profile.sound.volume - 0.6).abs() < f32::EPSILON);
         assert_eq!(profile.format, TimeFormat::H24);
@@ -842,7 +959,7 @@ mod tests {
         });
         let profile: ClockProfile = serde_json::from_value(raw).unwrap();
         assert!((profile.brightness - 0.45).abs() < f32::EPSILON);
-        assert_eq!(profile.font, DigitFont::Bahnschrift);
+        assert_eq!(profile.font, "bahnschrift");
         assert!(!profile.sound.enabled);
         assert!((profile.sound.volume - 0.3).abs() < f32::EPSILON);
 
@@ -872,6 +989,15 @@ mod tests {
             "date": { "color": "#d2b77f", "opacity": 100 },
             "seam": { "color": "#4a2d0e", "opacity": 100 },
             "separator": { "color": "#2a1a08", "opacity": 62 }
+        })
+    }
+
+    fn sample_font_json(id: &str) -> serde_json::Value {
+        serde_json::json!({
+            "id": id,
+            "name": "测试字体",
+            "file": format!("{id}.ttf"),
+            "hash": "abc123"
         })
     }
 
@@ -988,6 +1114,95 @@ mod tests {
             .collect();
         normalize_appearance(&mut appearance);
         assert_eq!(appearance.custom_themes.len(), CUSTOM_THEME_LIMIT);
+    }
+
+    #[test]
+    fn custom_fonts_normalize_and_profiles_keep_them() {
+        let mut appearance = Appearance::default();
+        appearance.fonts = vec![serde_json::from_value(sample_font_json("custom-a")).unwrap()];
+        appearance.profiles.get_mut("classic-dark").unwrap().font = String::from("custom-a");
+
+        normalize_appearance(&mut appearance);
+
+        assert_eq!(appearance.fonts.len(), 1);
+        assert_eq!(appearance.profiles["classic-dark"].font, "custom-a");
+    }
+
+    #[test]
+    fn dangling_font_falls_back_to_bebas() {
+        let mut appearance = Appearance::default();
+        appearance.profiles.get_mut("classic-dark").unwrap().font = String::from("custom-gone");
+
+        normalize_appearance(&mut appearance);
+
+        assert_eq!(appearance.profiles["classic-dark"].font, "bebas");
+    }
+
+    #[test]
+    fn normalize_drops_invalid_and_duplicate_fonts() {
+        let mut appearance = Appearance::default();
+        let mut bad_file = sample_font_json("custom-b");
+        bad_file["file"] = serde_json::json!("custom-other.ttf");
+        let mut blank = sample_font_json("custom-c");
+        blank["name"] = serde_json::json!("   ");
+        appearance.fonts = vec![
+            serde_json::from_value(sample_font_json("custom-a")).unwrap(),
+            serde_json::from_value(sample_font_json("custom-a")).unwrap(),
+            serde_json::from_value(bad_file).unwrap(),
+            serde_json::from_value(blank).unwrap(),
+            serde_json::from_value(sample_font_json("bebas")).unwrap(),
+            serde_json::from_value(sample_font_json("custom-../evil")).unwrap(),
+        ];
+
+        normalize_appearance(&mut appearance);
+
+        assert_eq!(appearance.fonts.len(), 2);
+        assert_eq!(appearance.fonts[0].id, "custom-a");
+        assert_eq!(appearance.fonts[1].id, "custom-c");
+        assert_eq!(appearance.fonts[1].name, "custom-c");
+    }
+
+    #[test]
+    fn normalize_truncates_fonts_to_the_limit() {
+        let mut appearance = Appearance::default();
+        appearance.fonts = (0..40)
+            .map(|index| {
+                serde_json::from_value(sample_font_json(&format!("custom-{index}"))).unwrap()
+            })
+            .collect();
+
+        normalize_appearance(&mut appearance);
+
+        assert_eq!(appearance.fonts.len(), CUSTOM_FONT_LIMIT);
+    }
+
+    #[test]
+    fn font_names_reject_path_traversal() {
+        assert!(is_font_name("custom-a.ttf"));
+        assert!(is_font_name("custom-a.woff2"));
+        assert!(!is_font_name("../../settings.json"));
+        assert!(!is_font_name("custom-a.exe"));
+        assert!(!is_font_name("Custom-A.ttf"));
+        assert!(!is_font_name("custom-a/b.ttf"));
+        assert!(!is_font_name(".ttf"));
+        assert!(is_font_file_for_id("custom-a", "custom-a.otf"));
+        assert!(!is_font_file_for_id("custom-a", "custom-b.otf"));
+    }
+
+    #[test]
+    fn builtin_ids_are_not_valid_import_font_ids() {
+        assert!(is_safe_font_id("custom-a"));
+        assert!(!is_safe_font_id("bebas"));
+        assert!(!is_safe_font_id("bahnschrift"));
+        assert!(!is_safe_font_id("custom-../evil"));
+        assert!(!is_font_file_for_id("bebas", "bebas.ttf"));
+    }
+
+    #[test]
+    fn clock_profile_font_accepts_custom_ids() {
+        let profile: ClockProfile =
+            serde_json::from_value(serde_json::json!({ "font": "custom-a" })).unwrap();
+        assert_eq!(profile.font, "custom-a");
     }
 
     /// id 会被拼进文件路径：大写、斜杠、点都应整条拒绝，而不是留给导入时再挡。

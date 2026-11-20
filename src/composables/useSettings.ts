@@ -5,6 +5,8 @@ import { reactive, ref, watch } from "vue";
 import { trackFeatureToggled, trackUiAppearance } from "../lib/analytics";
 import { applyAppearance } from "../lib/appearance";
 import { cloneJson } from "../lib/clone";
+import { initFontAssets, setFontLibrary } from "../lib/fonts";
+import { isBuiltinFontId } from "../lib/fontRegistry";
 import { initThemeAssets } from "../lib/theme/assets";
 import { isTauri } from "../lib/env";
 import { applyLanguage } from "../lib/i18n";
@@ -19,6 +21,7 @@ import {
   SOUND_VOLUME_MAX,
   SOUND_VOLUME_MIN,
   type ClockProfile,
+  type CustomFont,
   type DigitFont,
   type Settings,
   type SettingsPatch,
@@ -26,9 +29,21 @@ import {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-/** 只接受本版本认识的字体；旧配置或手改文件带来的未知值一律落回 Bebas。 */
-function readFont(value: unknown): DigitFont {
+/** 只接受本版本认识的内置字体；浏览器开发模式的 ?font= 也走这里。 */
+function readDevFont(value: unknown): DigitFont {
   return value === "bahnschrift" || value === "system" ? value : "bebas";
+}
+
+/**
+ * 钟面配置里的字体 id：内置 id 或字体库里存在的导入 id。
+ * 悬空 id 一律回退 Bebas；Rust 读盘时也会做同一件事。
+ */
+function normalizeFontId(value: unknown, fonts: CustomFont[]): string {
+  if (typeof value === "string") {
+    if (isBuiltinFontId(value)) return value;
+    if (value.startsWith("custom-") && fonts.some((font) => font.id === value)) return value;
+  }
+  return "bebas";
 }
 
 function clampProfile(profile: ClockProfile): void {
@@ -83,6 +98,13 @@ watch(
     timer = setTimeout(flush, 200);
   },
   { deep: true },
+);
+
+// 字体库的增删改名会直接决定哪些导入字体能加载；字体管理器只认这一份快照。
+watch(
+  () => settings.appearance.fonts,
+  (fonts) => setFontLibrary(fonts),
+  { deep: true, immediate: true },
 );
 
 /**
@@ -142,13 +164,16 @@ function applyRemoteAppearance(remote: Settings): void {
   settings.appearance = {
     theme: appearance?.theme ?? settings.appearance.theme,
     customThemes: cloneJson(appearance?.customThemes ?? []),
+    fonts: cloneJson(appearance?.fonts ?? []),
     profiles: cloneJson(appearance?.profiles ?? {}),
   };
   // 配置表与主题表必须一一对应；再兜一次边界，手改配置也不会带进越界值。
   ensureProfiles(settings);
   for (const profile of Object.values(settings.appearance.profiles)) {
+    profile.font = normalizeFontId(profile.font, settings.appearance.fonts);
     clampProfile(profile);
   }
+  setFontLibrary(settings.appearance.fonts);
 }
 
 function applyRemoteUi(remote: Settings): void {
@@ -198,9 +223,10 @@ function wirePreviewSync(): void {
 
 async function load() {
   if (loaded.value) return;
-  // 主题图片的根目录路径要异步取。不 await：路径到位后 base 这个 ref 会触发
-  // 模板重算，图片自然补上，不必挡住窗口出现。
+  // 主题图片 / 导入字体的根目录路径要异步取。不 await：路径到位后 ref 会触发
+  // 模板重算，图片与字体自然补上，不必挡住窗口出现。
   void initThemeAssets();
+  void initFontAssets();
   if (!isTauri()) {
     // 仅开发期：在浏览器里核对另一种排布的几何时才看 URL，
     // 打包后 import.meta.env.DEV 为 false，这段整体被裁掉。
@@ -208,7 +234,7 @@ async function load() {
       const profile = profileOf(settings);
       const params = new URLSearchParams(window.location.search);
       if (params.get("layout") === "per-pair") profile.digitLayout = "per-pair";
-      if (params.get("font")) profile.font = readFont(params.get("font"));
+      if (params.get("font")) profile.font = readDevFont(params.get("font"));
       if (params.get("colon") === "1") profile.showColon = true;
       const brightness = Number(params.get("brightness"));
       if (params.get("brightness") && Number.isFinite(brightness)) {
@@ -224,7 +250,7 @@ async function load() {
       const remote = await invoke<Settings>("get_settings");
       beginHydration();
       try {
-        settings.schemaVersion = remote.schemaVersion ?? 3;
+        settings.schemaVersion = remote.schemaVersion ?? 4;
         applyRemoteAppearance(remote);
         settings.system = {
           closeToTray: remote.system?.closeToTray ?? true,

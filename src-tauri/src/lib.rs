@@ -159,6 +159,9 @@ pub fn run() {
             commands::import_theme_image,
             commands::remove_theme_image,
             commands::delete_theme_dir,
+            commands::fonts_dir_path,
+            commands::import_font,
+            commands::remove_font,
         ])
         .build(tauri::generate_context!())
         .expect("error while running FlipClock")

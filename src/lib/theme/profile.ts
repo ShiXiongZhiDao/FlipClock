@@ -47,6 +47,13 @@ export function profileFor(settings: Settings, id: string): ClockProfile {
   return settings.appearance.profiles[id] ?? FALLBACK_PROFILE;
 }
 
+/** 哪些主题的钟面配置正在使用这款字体；删除字体确认框用。 */
+export function themeIdsUsingFont(settings: Settings, fontId: string): string[] {
+  return Object.entries(settings.appearance.profiles)
+    .filter(([, profile]) => profile.font === fontId)
+    .map(([themeId]) => themeId);
+}
+
 /** 音量滑杆的统一规则：拖到 0 就是静音，拖回非零顺手打开开关。 */
 export function setSoundVolume(profile: ClockProfile, percent: number): void {
   profile.sound.volume = percent / 100;

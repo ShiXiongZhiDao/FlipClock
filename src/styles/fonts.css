@@ -1,31 +1,3 @@
-/* 数字字体。三款全部是系统自带或已随包，不引入新资产。
-   字号比例按「字体 × 数字排布」分别标定：Bebas 极窄，两位一卡也放得下；
-   Bahnschrift / Segoe UI 接近方形，双位卡必须缩一档才不会顶出卡片。
-   --digit-shift 用于逐款微调字形的视觉垂直居中（字形基线与 Bebas 不同）。 */
-
-[data-clock-font="bebas"] {
-  --font-clock: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
-  --font-scale-single: 1;
-  --font-scale-pair: 1;
-  --digit-weight: 400;
-  --digit-spacing: -0.02em;
-  --digit-shift: 0.05em;
-}
-
-[data-clock-font="bahnschrift"] {
-  --font-clock: Bahnschrift, "Segoe UI", "Arial Narrow", sans-serif;
-  --font-scale-single: 0.98;
-  --font-scale-pair: 0.72;
-  --digit-weight: 500;
-  --digit-spacing: 0;
-  --digit-shift: 0.065em;
-}
-
-[data-clock-font="system"] {
-  --font-clock: "Segoe UI", "Segoe UI Variable Text", Arial, sans-serif;
-  --font-scale-single: 0.96;
-  --font-scale-pair: 0.78;
-  --digit-weight: 500;
-  --digit-spacing: -0.01em;
-  --digit-shift: -0.065em;
-}
+/* 内置钟面字体的定义已迁到 src/lib/fontRegistry.ts（ADR-0026 D19）。
+   字族、字重、字号比例与偏移都由注册表生成 CSS 变量；此文件保留为空占位，
+   避免 main.ts 的样式导入路径变化。 */

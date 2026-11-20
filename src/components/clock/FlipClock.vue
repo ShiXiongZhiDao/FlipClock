@@ -1,16 +1,12 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
 
 import FlipGroup from "./FlipGroup.vue";
 import { playFlipSound } from "../../lib/flipSound";
+import { ensureFontLoaded, fontStyleVars, getFontEntry } from "../../lib/fonts";
 import { locale } from "../../lib/i18n";
 import { buildThemeVars } from "../../lib/theme/material";
-import type {
-  DigitFont,
-  DigitLayout,
-  ThemeSpec,
-  TimeFormat,
-} from "../../types/settings";
+import type { DigitLayout, ThemeSpec, TimeFormat } from "../../types/settings";
 
 const props = defineProps<{
   now: Date;
@@ -26,8 +22,8 @@ const props = defineProps<{
   layout: DigitLayout;
   /** 时、分之间的两个小圆点。关掉时连间距一起收起，不留空洞。 */
   showColon: boolean;
-  /** 数字字体。只影响钟面数字，日期行与 AM/PM 仍用界面字体。 */
-  font: DigitFont;
+  /** 钟面字体 id：内置 id，或字体库里的 `custom-<uuid>`（ADR-0026）。 */
+  font: string;
   /** 钟面整体亮度（只压暗），1 = 原样。 */
   brightness: number;
   /** stage = 全屏屏保，panel = 嵌在卡片里(按容器宽度缩放)，thumb = 系统预览的缩略画布 */
@@ -89,6 +85,36 @@ const themeVars = computed(() =>
   }),
 );
 
+const clockRoot = ref<HTMLElement | null>(null);
+const visible = ref(false);
+let fontObserver: IntersectionObserver | null = null;
+
+onMounted(() => {
+  if (!clockRoot.value) return;
+  if (typeof IntersectionObserver !== "function") {
+    visible.value = true;
+    return;
+  }
+  fontObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) visible.value = true;
+    },
+    { rootMargin: "64px" },
+  );
+  fontObserver.observe(clockRoot.value);
+});
+
+onBeforeUnmount(() => fontObserver?.disconnect());
+
+/** 导入字体按可见性加载；主题墙里的离屏钟面不下载字体。 */
+watchEffect(() => {
+  if (!visible.value) return;
+  const entry = getFontEntry(props.font);
+  if (entry) void ensureFontLoaded(entry);
+});
+
+const fontVars = computed(() => fontStyleVars(props.font));
+
 /** 只统计真正显示出来的数字：秒数关掉时，秒的变化不该触发音效。 */
 const stamp = computed(() =>
   props.showSeconds
@@ -127,15 +153,16 @@ const dateText = computed(() => {
 
 <template>
   <div
+    ref="clockRoot"
     class="clock"
     :class="[
       `clock--${variant}`,
       { 'clock--pair': layout === 'per-pair', 'clock--seconds': showSeconds },
     ]"
     :data-clock-theme="theme.id"
-    :data-clock-font="font"
     :style="[
       themeVars,
+      fontVars,
       {
         '--flip-half': `${halfDuration}ms`,
         '--user-scale': scaleValue,
@@ -170,8 +197,8 @@ const dateText = computed(() => {
   align-items: center;
   justify-content: center;
   gap: var(--clock-gap);
-  /* 字体分两处给：数字读 --font-clock，日期行与 AM/PM 读 --font-ui。
-     这里不设兜底 family，否则是一条永远被覆盖的死声明。 */
+  /* 字体分两处给：数字读 --font-clock；日期行与 AM/PM 读 --font-clock-face，
+     再回落到界面字体，保证缺 CJK 时仍能显示。 */
   /* 亮度只压暗整块钟面：背景、卡片、数字、日期一起变，纯黑仍是纯黑。 */
   filter: brightness(var(--brightness, 1));
   /* 四层自下而上：背景图 → 底色蒙版 → 压暗 → 光晕。
@@ -353,9 +380,10 @@ const dateText = computed(() => {
 }
 
 .date-line {
-  font-family: var(--font-ui);
+  font-family: var(--font-clock-face, var(--font-ui)), var(--font-ui);
   font-size: var(--date-size);
-  font-weight: 500;
+  font-weight: var(--font-text-weight, 500);
+  font-synthesis: none;
   letter-spacing: 0.26em;
   text-transform: uppercase;
   color: var(--date-color);
@@ -372,9 +400,10 @@ const dateText = computed(() => {
 }
 
 .meridiem {
-  font-family: var(--font-ui);
+  font-family: var(--font-clock-face, var(--font-ui)), var(--font-ui);
   font-size: calc(var(--date-size) * 0.92);
-  font-weight: 700;
+  font-weight: var(--font-text-weight, 500);
+  font-synthesis: none;
   letter-spacing: 0.16em;
   color: var(--date-color);
   align-self: flex-start;

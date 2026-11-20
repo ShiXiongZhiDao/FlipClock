@@ -59,6 +59,13 @@ pub enum AppError {
     ThemeImageCopyFailed { detail: String },
     ThemeDirUnavailable { detail: String },
     InvalidThemeId { detail: String },
+    // 字体导入（ADR-0026）。与图片一样，拒绝理由分开，用户才知道该换文件还是换格式。
+    #[serde(rename_all = "camelCase")]
+    FontTooLarge { limit_mb: u32 },
+    FontUnsupported { detail: String },
+    FontCopyFailed { detail: String },
+    FontDirUnavailable { detail: String },
+    InvalidFontId { detail: String },
     // 全屏配置窗口关不掉（ADR-0020 D19）。关窗失败必须留痕并回给调用方，
     // 不能像以前那样吞掉失败、还照发「窗口已关闭」事件。
     ThemePreviewCloseFailed { detail: String },
@@ -130,5 +137,11 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&raw).expect("错误串应是 JSON");
         assert_eq!(value["limitSide"], 8192);
         assert!(value.get("limit_side").is_none(), "字段名必须是驼峰");
+
+        let raw = AppError::FontTooLarge { limit_mb: 32 }.as_string();
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("错误串应是 JSON");
+        assert_eq!(value["code"], "fontTooLarge");
+        assert_eq!(value["limitMb"], 32);
+        assert!(value.get("limit_mb").is_none(), "字段名必须是驼峰");
     }
 }

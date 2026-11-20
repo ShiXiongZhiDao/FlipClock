@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { onMounted, ref } from "vue";
 
 import FullscreenSetupOverlay from "../components/theme/FullscreenSetupOverlay.vue";
+import { initFontAssets, setFontLibrary } from "../lib/fonts";
 import { initThemeAssets } from "../lib/theme/assets";
 import { previewLanguage } from "../lib/i18n";
 import { applyAppearance } from "../lib/appearance";
@@ -22,8 +23,9 @@ import { loadStudio, type StudioPayload } from "../lib/theme/studio";
 const ready = ref(false);
 
 onMounted(async () => {
-  // 主题图片的根目录路径要先拿到，草稿里的背景与纹理才渲染得出来。
+  // 主题图片 / 导入字体的根目录路径要先拿到，草稿里的背景、纹理与字体才渲染得出来。
   void initThemeAssets();
+  void initFontAssets();
   try {
     const raw = await invoke<string | null>("get_theme_preview");
     if (!raw) {
@@ -42,6 +44,7 @@ onMounted(async () => {
     applyAppearance(payload.settings.ui.appearance ?? "system");
     // 主窗口构造快照时已经补齐过；这里再兜一次，手改载荷也不会出现空配置。
     ensureProfiles(payload.settings);
+    setFontLibrary(payload.settings.appearance.fonts ?? []);
     loadStudio(payload);
     ready.value = true;
   } catch (error) {

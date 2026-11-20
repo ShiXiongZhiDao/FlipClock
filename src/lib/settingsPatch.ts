@@ -13,6 +13,7 @@ export function settingsPatchOf(settings: Settings): SettingsPatch {
       theme: settings.appearance.theme,
       // 深拷贝：patch 是发给后端的快照，不能继续指向响应式对象。
       customThemes: cloneJson(settings.appearance.customThemes),
+      fonts: cloneJson(settings.appearance.fonts),
       profiles: cloneJson(settings.appearance.profiles),
     },
     screensaver: { ...settings.screensaver },
