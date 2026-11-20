@@ -8,7 +8,7 @@ import { useSettings } from "../../composables/useSettings";
 import { isTauri } from "../../lib/env";
 import { errorText, t, type MessageKey } from "../../lib/i18n";
 import { useUpdater } from "../../lib/updater";
-import type { ScreenSaverStatus } from "../../types/settings";
+import type { NoArgMode } from "../../types/settings";
 
 /**
  * 二维码与公众号横幅走公开仓库，不进安装包：换图不必重发版本，
@@ -65,7 +65,7 @@ function wireQrImages() {
   }
 }
 
-const { settings } = useSettings();
+const { settings, reset } = useSettings();
 
 /** 三个语言选项。跟随系统的实际语言由 i18n 在启动时算，不在 UI 上展开地区变体。 */
 const LANGUAGE_OPTIONS: { value: "system" | "zh" | "en"; label: MessageKey }[] = [
@@ -78,7 +78,6 @@ const LANGUAGE_OPTIONS: { value: "system" | "zh" | "en"; label: MessageKey }[] =
 const autostart = ref(false);
 const busy = ref(false);
 const version = ref("");
-const saver = ref<ScreenSaverStatus | null>(null);
 const message = ref<{ tone: "ok" | "err"; text: string } | null>(null);
 let messageTimer: ReturnType<typeof setTimeout> | undefined;
 let unlisten: (() => void) | undefined;
@@ -119,35 +118,31 @@ async function toggleAutostart() {
   }
 }
 
-/** 术语表里的四种注册状态一个都不能少：二分成「已装/未装」会把过期说成没装。 */
-const SAVER_LABEL: Record<string, MessageKey> = {
-  notInstalled: "saver.status.notInstalled",
-  installed: "saver.status.installed",
-  missing: "saver.status.missing",
-  outdated: "saver.status.outdated",
-};
+function setNoArgMode(mode: NoArgMode) {
+  settings.launch.noArgMode = mode;
+}
 
-const saverLabel = computed(() =>
-  saver.value
-    ? SAVER_LABEL[saver.value.state]
-      ? t(SAVER_LABEL[saver.value.state])
-      : saver.value.state
-    : "—",
-);
-const saverNeedsInstall = computed(
-  () => saver.value?.state === "outdated" || saver.value?.state === "missing",
-);
-
-async function reinstallSaver() {
-  if (!isTauri() || busy.value) return;
-  busy.value = true;
+/**
+ * 恢复默认是全局破坏性操作：图标按钮换成系统页里带清单的按钮后，
+ * 弹窗必须说清「会清什么、不会清什么」。reset() 清外观/屏保/启动/系统/语言，
+ * 但注册信息与回滚点（registration）保留——清单里的两条说明就按这个事实写。
+ */
+const restorePrompt = ref(false);
+const restoreBusy = ref(false);
+async function confirmRestore() {
+  restoreBusy.value = true;
   try {
-    saver.value = await invoke<ScreenSaverStatus>("install_screensaver");
-    notify("ok", t("system.saverUpdatedToast"));
-  } catch (error) {
-    notify("err", errorText(error));
+    // reset 会连带删掉自定义主题的图片目录（ADR-0020 D15）。删不掉的 id 会返回来，
+    // 这时配置已经恢复默认了——不能说「失败」，但要说明磁盘上还有残留。
+    const failed = await reset();
+    restorePrompt.value = false;
+    if (failed.length > 0) {
+      notify("err", t("system.restoreThemeCleanupFailed", { count: failed.length }));
+    } else {
+      notify("ok", t("settings.restoreSuccess"));
+    }
   } finally {
-    busy.value = false;
+    restoreBusy.value = false;
   }
 }
 
@@ -205,7 +200,6 @@ onMounted(async () => {
   if (!isTauri()) return;
   version.value = await getVersion();
   await Promise.all([refreshAutostart(), loadInstallKind()]);
-  saver.value = await invoke<ScreenSaverStatus>("screensaver_status");
   // 托盘菜单也能切自启，两边共用注册表这份事实。
   unlisten = await listen<boolean>("autostart-changed", (event) => {
     autostart.value = event.payload;
@@ -220,155 +214,183 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="system-page">
-    <section class="card">
-      <div class="card-title">{{ t("language.title") }}</div>
-      <div class="language-options">
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("system.startupAndWindow") }}</span>
+      </div>
+
+      <div class="lines">
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.autostart") }}</span>
+            <span class="row-hint">{{ t("system.autostartHint") }}</span>
+          </div>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            :aria-checked="autostart"
+            :class="{ on: autostart }"
+            :disabled="busy"
+            @click="toggleAutostart"
+          >
+            <i></i>
+          </button>
+        </div>
+
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.closeToTray") }}</span>
+            <span class="row-hint">{{ t("system.closeToTrayHint") }}</span>
+          </div>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            :aria-checked="settings.system.closeToTray"
+            :class="{ on: settings.system.closeToTray }"
+            @click="settings.system.closeToTray = !settings.system.closeToTray"
+          >
+            <i></i>
+          </button>
+        </div>
+
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.noArgMode") }}</span>
+            <span class="row-hint">{{ t("system.noArgHint") }}</span>
+          </div>
+          <div class="segmented">
+            <button
+              type="button"
+              :class="{ selected: settings.launch.noArgMode === 'settings' }"
+              @click="setNoArgMode('settings')"
+            >
+              {{ t("system.noArgSettings") }}
+            </button>
+            <button
+              type="button"
+              :class="{ selected: settings.launch.noArgMode === 'fullscreen' }"
+              @click="setNoArgMode('fullscreen')"
+            >
+              {{ t("system.noArgFullscreen") }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="message" class="system-message" :class="message.tone">{{ message.text }}</p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("language.title") }}</span>
+      </div>
+      <div class="segmented narrow">
         <button
           v-for="option in LANGUAGE_OPTIONS"
           :key="option.value"
           type="button"
-          class="language-option"
           :class="{ selected: settings.ui.language === option.value }"
           @click="settings.ui.language = option.value"
         >
           {{ t(option.label) }}
         </button>
       </div>
-      <p class="row-hint language-hint">{{ t("language.hint") }}</p>
+      <p class="row-hint">{{ t("language.hint") }}</p>
     </section>
 
-    <section class="card">
-      <div class="card-title">{{ t("common.startup") }}</div>
-
-      <div class="row">
-        <div class="row-copy">
-          <span class="row-name">{{ t("system.autostart") }}</span>
-          <span class="row-hint">{{ t("system.autostartHint") }}</span>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="autostart"
-          :class="{ on: autostart }"
-          :disabled="busy"
-          @click="toggleAutostart"
-        >
-          <i></i>
-        </button>
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("system.restoreSection") }}</span>
       </div>
-
-      <div class="divider"></div>
-
-      <div class="row">
-        <div class="row-copy">
-          <span class="row-name">{{ t("system.closeToTray") }}</span>
-          <span class="row-hint">{{ t("system.closeToTrayHint") }}</span>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.system.closeToTray"
-          :class="{ on: settings.system.closeToTray }"
-          @click="settings.system.closeToTray = !settings.system.closeToTray"
-        >
-          <i></i>
-        </button>
-      </div>
-
-      <p v-if="message" class="system-message" :class="message.tone">
-        {{ message.text }}
-      </p>
-    </section>
-
-    <section class="card">
-      <div class="card-title">{{ t("system.about") }}</div>
-      <div class="info-row">
-        <span>{{ t("system.version") }}</span>
-        <strong>{{ version || "—" }}</strong>
-      </div>
-      <div class="info-row">
-        <span>{{ t("system.saverComponent") }}</span>
-        <span class="info-state">
-          <strong :class="{ warn: saverNeedsInstall }">{{ saverLabel }}</strong>
-          <button
-            v-if="saverNeedsInstall"
-            type="button"
-            class="link-button"
-            :disabled="busy"
-            @click="reinstallSaver"
-          >
-            {{ t("system.reinstall") }}
+      <div class="lines">
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.restoreDefaults") }}</span>
+            <span class="row-hint">{{ t("system.restoreHint") }}</span>
+          </div>
+          <button type="button" class="secondary" @click="restorePrompt = true">
+            {{ t("system.restoreAction") }}
           </button>
-        </span>
-      </div>
-      <div
-        v-if="saver?.activePath ?? saver?.targetPath"
-        class="info-path"
-        :title="saver?.activePath ?? saver?.targetPath ?? ''"
-      >
-        {{ saver?.activePath ?? saver?.targetPath }}
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="update-box">
-        <div class="update-copy">
-          <span class="update-title" :class="{ err: updateState.status === 'error' }">
-            {{ updateTitle }}
-          </span>
-          <span v-if="updateHint" class="update-hint">{{ updateHint }}</span>
         </div>
-        <button
-          v-if="updateAction === 'check'"
-          type="button"
-          class="ghost-button"
-          :disabled="updateBusy"
-          @click="checkForUpdate({})"
-        >
-          {{ t(updateState.status === "error" ? "system.update.retry" : "system.update.check") }}
-        </button>
-        <button
-          v-else-if="updateAction === 'install'"
-          type="button"
-          class="ghost-button accent"
-          :disabled="updateBusy"
-          @click="installUpdate"
-        >
-          {{ t("system.update.downloadInstall") }}
-        </button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("system.about") }}</span>
+      </div>
+
+      <div class="lines">
+        <div class="row">
+          <span class="row-name">{{ t("system.version") }}</span>
+          <span class="info-value">{{ version || "—" }}</span>
+        </div>
+
+        <div class="row update">
+          <div class="row-copy">
+            <span class="row-name" :class="{ err: updateState.status === 'error' }">
+              {{ updateTitle }}
+            </span>
+            <span v-if="updateHint" class="row-hint update-hint">{{ updateHint }}</span>
+          </div>
+          <button
+            v-if="updateAction === 'check'"
+            type="button"
+            class="secondary"
+            :disabled="updateBusy"
+            @click="checkForUpdate({})"
+          >
+            {{ t(updateState.status === "error" ? "system.update.retry" : "system.update.check") }}
+          </button>
+          <button
+            v-else-if="updateAction === 'install'"
+            type="button"
+            class="primary"
+            :disabled="updateBusy"
+            @click="installUpdate"
+          >
+            {{ t("system.update.downloadInstall") }}
+          </button>
+        </div>
       </div>
     </section>
 
     <!-- 关于作者、公众号与赞助：图片一律走远端仓库，不占安装包体积。 -->
-    <div id="about-cards" class="about-cards">
-      <section class="card">
-        <div class="card-title">{{ t("system.aboutAuthor") }}</div>
+    <div id="about-cards">
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">{{ t("system.aboutAuthor") }}</span>
+        </div>
         <p class="about-text">{{ t("system.aboutText") }}</p>
         <div class="about-links">
-          <button type="button" class="ghost-button" @click="openAboutLink('website')">
+          <button type="button" class="secondary" @click="openAboutLink('website')">
             {{ t("system.officialWebsite") }}
           </button>
-          <button type="button" class="ghost-button" @click="openAboutLink('projects')">
+          <button type="button" class="secondary" @click="openAboutLink('projects')">
             {{ t("system.openSource") }}
           </button>
-          <button type="button" class="ghost-button" @click="openAboutLink('issues')">
+          <button type="button" class="secondary" @click="openAboutLink('issues')">
             {{ t("system.feedback") }}
           </button>
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-title">{{ t("system.followWechat") }}</div>
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">{{ t("system.followWechat") }}</span>
+        </div>
         <div class="qr-slot qr-banner">
           <img data-qr="wechat-official.png" :alt="t('system.wechatQrAlt')" referrerpolicy="no-referrer" />
           <p class="qr-fail">{{ t("system.wechatQrFail") }}</p>
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-title">{{ t("system.sponsor") }}</div>
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">{{ t("system.sponsor") }}</span>
+        </div>
         <p class="about-text">{{ t("system.sponsorText") }}</p>
         <div class="qr-row">
           <div class="qr-slot qr-tile">
@@ -382,202 +404,87 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
+
+    <!-- 恢复默认的影响清单。不能只用一句 confirm：reset() 动五段配置，
+         用户有权在清掉之前看到「哪些自建内容会消失」。 -->
+    <Transition name="fade">
+      <div v-if="restorePrompt" class="confirm-backdrop" @click.self="restorePrompt = false">
+        <div class="confirm" role="dialog" aria-modal="true" :aria-label="t('system.restoreDefaults')">
+          <strong>{{ t("system.restoreConfirmTitle") }}</strong>
+          <p class="confirm-lead">{{ t("system.restoreConfirmLead") }}</p>
+          <ul class="confirm-list">
+            <li>{{ t("system.restoreScopeTheme") }}</li>
+            <li>{{ t("system.restoreScopeClock") }}</li>
+            <li>{{ t("system.restoreScopeSaver") }}</li>
+            <li>{{ t("system.restoreScopeStartup") }}</li>
+            <li>{{ t("system.restoreScopeLanguage") }}</li>
+          </ul>
+          <p class="confirm-keep">{{ t("system.restoreKeep") }}</p>
+          <div class="confirm-actions">
+            <button type="button" class="secondary" @click="restorePrompt = false">
+              {{ t("system.restoreCancel") }}
+            </button>
+            <button type="button" class="primary" :disabled="restoreBusy" @click="confirmRestore">
+              {{ t("system.restoreAction") }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
 .system-page {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ui-scroll) transparent;
-}
-
-/* 两段设置而已，撑满整页会像少了东西；但也别缩成一条，留到能读的宽度。 */
-.card {
-  width: 100%;
-  max-width: 560px;
-}
-
-.row-hint {
-  font-size: 10px;
-  color: var(--ui-text-muted);
-}
-
-.language-options {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.language-option {
-  padding: 8px 10px;
-  border: 1px solid var(--ui-divider);
-  border-radius: 9px;
-  background: var(--ui-bg);
-  color: var(--ui-text-secondary);
-  cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.language-option:hover {
-  border-color: var(--ui-accent-line);
-}
-
-.language-option.selected {
-  border-color: var(--ui-accent-line-strong);
-  box-shadow: 0 0 0 1px var(--ui-accent-halo);
-  color: var(--ui-text);
-}
-
-.language-hint {
-  margin: 8px 0 0;
-}
-
-.info-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
-  font-size: 12px;
-  color: var(--ui-text-secondary);
-}
-
-.info-row strong {
-  font-weight: 500;
-  color: var(--ui-text);
-}
-
-.info-row strong.warn {
-  color: var(--ui-danger);
-}
-
-.info-state {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.link-button {
-  padding: 0;
-  font-size: 11px;
-  color: var(--ui-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.link-button:disabled {
-  opacity: 0.5;
-}
-
-.info-path {
-  padding-top: 4px;
-  font-size: 10px;
-  color: var(--ui-text-muted);
-  word-break: break-all;
-}
-
-.update-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 2px;
-}
-
-.update-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   min-width: 0;
 }
 
-.update-title {
-  font-size: 12px;
-  color: var(--ui-text);
+.segmented.narrow {
+  align-self: flex-start;
+  /* 不设固定宽度：容器按按钮内容收缩，后面才不会多出一截空灰底。
+     早先写死 208/264px 是按"别铺满整行"来的，但 align-self:flex-start
+     本身就已经贴合内容，宽度反而成了多余的灰。 */
+  width: max-content;
 }
 
-.update-title.err {
-  color: var(--ui-danger);
+.info-value {
+  font-size: 11px;
+  color: var(--ui-text);
 }
 
 .update-hint {
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--ui-text-muted);
-  word-break: break-word;
-}
-
-.ghost-button {
-  flex: none;
-  padding: 6px 11px;
-  font-size: 11px;
-  border-radius: 7px;
-  border: 1px solid var(--ui-divider);
-  background: var(--ui-surface);
-  color: var(--ui-text-secondary);
-  transition: color 0.16s ease, border-color 0.16s ease;
-}
-
-.ghost-button:hover:not(:disabled) {
-  color: var(--ui-text);
-  border-color: var(--ui-accent);
-}
-
-.ghost-button.accent {
-  color: var(--ui-accent);
-  border-color: var(--ui-accent);
-}
-
-.ghost-button:disabled {
-  opacity: 0.5;
+  max-width: 380px;
 }
 
 .system-message {
-  margin: 4px 0 0;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .system-message.ok {
-  color: var(--ui-accent-text);
+  color: var(--ui-success);
 }
 
 .system-message.err {
   color: var(--ui-danger);
 }
 
-.about-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .about-text {
-  margin: 0;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--ui-text-secondary);
 }
 
 .about-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-}
-
-.about-links .ghost-button {
-  display: inline-flex;
-  align-items: center;
 }
 
 .qr-row {
   display: flex;
-  gap: 14px;
+  gap: 12px;
 }
 
 .qr-slot {
@@ -585,9 +492,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 120px;
-  border-radius: 8px;
-  background: var(--ui-track, var(--ui-bg));
+  min-height: 116px;
+  border-radius: var(--radius-panel);
+  background: var(--ui-surface-sunken);
   overflow: hidden;
 }
 
@@ -604,12 +511,12 @@ onBeforeUnmount(() => {
 }
 
 .qr-tile img {
-  width: 132px;
+  width: 128px;
 }
 
 .qr-banner img {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
 }
 
 .qr-fail {
@@ -624,5 +531,76 @@ onBeforeUnmount(() => {
 
 .qr-slot.failed .qr-fail {
   display: block;
+}
+
+/* 弹窗盖在整窗之上（含标题栏），不能放进 .page-scroll——那会跟着滚动。 */
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.confirm {
+  width: min(420px, calc(100% - 48px));
+  padding: 18px 20px 16px;
+  border: 1px solid var(--ui-divider-strong);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+
+.confirm strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.confirm-lead,
+.confirm-keep {
+  margin: 9px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ui-text-secondary);
+}
+
+.confirm-list {
+  margin: 8px 0 0;
+  padding: 0 0 0 17px;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--ui-text-secondary);
+}
+
+.confirm-list li + li {
+  margin-top: 1px;
+}
+
+.confirm-keep {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--ui-divider);
+  font-size: 10px;
+  color: var(--ui-text-muted);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.14s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

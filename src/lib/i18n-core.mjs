@@ -52,8 +52,14 @@ export function parseErrorPayload(text) {
   const obj = parsed;
   if (typeof obj.code !== "string") return null;
   const params = {};
-  if (typeof obj.detail === "string") params.detail = obj.detail;
-  if (typeof obj.key === "string") params.key = obj.key;
-  if (typeof obj.label === "string") params.label = obj.label;
+  // 转发全部标量参数，不只 detail/key/label。
+  //
+  // 白名单式转发过一次真实的坑：Rust 新增 limit_mb/limit_side 后，字典里的
+  // {limitMb} 拿不到值，用户看到的是没被替换的裸占位符；而类型检查与当时的
+  // i18n 闸都只比 key 集合，谁都没拦住。code 不转发——它是查表用的，不是插值参数。
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === "code") continue;
+    if (typeof value === "string" || typeof value === "number") params[key] = value;
+  }
   return { code: obj.code, params };
 }

@@ -12,6 +12,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { readonly, ref } from "vue";
 
+import { trackUpdateChecked } from "./analytics";
 import { isTauri } from "./env";
 
 export type UpdaterState =
@@ -59,6 +60,8 @@ export function useUpdater() {
     state.value = { status: "checking" };
     try {
       const update = await check({ timeout: options.silent ? 15000 : 30000 });
+      // 检查发生即记一次，不区分自动还是手动：事件描述的是动作本身。
+      trackUpdateChecked();
       if (!update) {
         pending = null;
         state.value = { status: "upToDate" };

@@ -33,7 +33,7 @@ FlipClock turns a Windows desktop into a mechanical split-flap clock. Each digit
 - **Not a web page.** It is a native Windows app; the clock UI runs locally in WebView2.
 - **Not an alarm, timer, or calendar.** It tells the time and, optionally, the date. Nothing rings.
 - **Not a replacement for the Windows lock screen.** It is a screensaver you choose in the Windows dialog, plus a full-screen mode you start yourself.
-- **Not a cloud service.** There is no account, no sync, and no telemetry. The only outbound request is the optional update check.
+- **Not a cloud service.** There is no account, no sync, and no cloud storage.
 - **Not cross-platform.** Windows 10/11 x64 only. The Windows system-preview hook (`/p <HWND>`) is intentionally unsupported: the process exits without creating a window.
 
 ## Why this exists
@@ -56,21 +56,18 @@ A split-flap clock is nice to look at, but most desktop versions are either a br
 
 The two full-screen images above show the two digit layouts. In v1.0.0 the settings UI is Chinese only; the images below are included so you can see how much is configurable, and an English UI is planned for a later release.
 
-| Clock preview | Appearance / themes |
+| Appearance / themes | Time and date |
 | --- | --- |
-| <img src="./assets/screenshots/zh/clock-preview.jpg" alt="Clock preview settings page" width="700"> | <img src="./assets/screenshots/zh/appearance.jpg" alt="Appearance settings page" width="700"> |
+| <img src="./assets/screenshots/zh/appearance.jpg" alt="Appearance settings page" width="700"> | <img src="./assets/screenshots/zh/time-and-date.jpg" alt="Time and date settings page" width="700"> |
 
-| Time and date | Full-screen clock |
+| Sound | Full-screen clock |
 | --- | --- |
-| <img src="./assets/screenshots/zh/time-and-date.jpg" alt="Time and date settings page" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="Full-screen flip clock" width="700"> |
+| <img src="./assets/screenshots/zh/sound.jpg" alt="Sound settings page" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="Full-screen flip clock" width="700"> |
 
 ## Privacy and boundaries
 
-- FlipClock runs locally. It has no account system, no analytics, and no telemetry.
-- The only outbound request is the **optional** update check from the System → About page. It asks Gitee first, then GitHub, and does nothing unless you ask it to check.
-- Update packages are signed with minisign; the installer verifies the signature before applying an update.
-- Settings are stored per user. The screensaver component is installed per user and never touches `System32`.
-- The clock has no access to the camera, microphone, filesystem contents, or clipboard.
+- No personal information is collected.
+- No access to the camera, microphone, file contents, or clipboard.
 
 ## How to install
 

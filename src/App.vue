@@ -4,6 +4,7 @@ import { computed } from "vue";
 import ImmersiveClockView from "./views/ImmersiveClockView.vue";
 import PreviewView from "./views/PreviewView.vue";
 import SettingsView from "./views/SettingsView.vue";
+import ThemePreviewView from "./views/ThemePreviewView.vue";
 import { readBoot } from "./types/boot";
 
 const boot = readBoot();
@@ -13,7 +14,8 @@ const saverExitsOnInput = computed(() => boot.exitOnInput || boot.debugWindowed)
 </script>
 
 <template>
-  <SettingsView v-if="boot.mode === 'settings'" />
+  <ThemePreviewView v-if="boot.mode === 'theme-preview'" />
+  <SettingsView v-else-if="boot.mode === 'settings'" />
   <ImmersiveClockView
     v-else-if="boot.mode === 'screensaver'"
     :exit-on-input="saverExitsOnInput"

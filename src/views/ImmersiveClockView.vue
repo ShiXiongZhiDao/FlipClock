@@ -5,6 +5,8 @@ import { onBeforeUnmount, onMounted } from "vue";
 import FlipClock from "../components/clock/FlipClock.vue";
 import { useClock } from "../composables/useClock";
 import { useSettings } from "../composables/useSettings";
+import { useTheme } from "../composables/useTheme";
+import { trackAppStarted } from "../lib/analytics";
 import { unlockFlipSound } from "../lib/flipSound";
 
 const props = defineProps<{
@@ -15,6 +17,7 @@ const props = defineProps<{
 
 const { now } = useClock();
 const { settings, load } = useSettings();
+const { current: currentTheme, profile, backgroundUrl, digitUrl } = useTheme();
 
 const SETTLE_GRACE = 700;
 const JITTER = 3;
@@ -61,20 +64,21 @@ function onMouseMove(event: MouseEvent) {
   }
 }
 
-/** 屏保里不该出现右键菜单、拖拽和文本选择。 */
+/** 屏保里不该出现拖拽。右键菜单已在 main.ts 全局抑制。 */
 function suppress(event: Event) {
   event.preventDefault();
 }
 
 onMounted(() => {
-  load();
+  // 选出「无参数进全屏/屏保」的用户也要算进启动统计。去重靠 localStorage
+  // 时间窗（多个 WebView 各有自己的模块状态），见 analytics.ts。
+  void load().then(() => trackAppStarted(settings));
   // 屏保/全屏里没有用户点击，音频上下文只能靠窗口参数放开自动播放；
   // 这里再解开一次，兼顾浏览器里直接预览的情况。
   unlockFlipSound();
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("mousedown", onMouseDown, true);
   window.addEventListener("mousemove", onMouseMove, true);
-  window.addEventListener("contextmenu", suppress, true);
   window.addEventListener("dragstart", suppress, true);
 });
 
@@ -82,7 +86,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeyDown, true);
   window.removeEventListener("mousedown", onMouseDown, true);
   window.removeEventListener("mousemove", onMouseMove, true);
-  window.removeEventListener("contextmenu", suppress, true);
   window.removeEventListener("dragstart", suppress, true);
 });
 </script>
@@ -91,17 +94,19 @@ onBeforeUnmount(() => {
   <div class="stage-host">
     <FlipClock
       :now="now"
-      :format="settings.time.format"
-      :show-date="settings.time.showDate"
-      :show-seconds="settings.time.showSeconds"
-      :theme="settings.appearance.theme"
-      :layout="settings.appearance.digitLayout"
-      :show-colon="settings.time.showColon"
-      :font="settings.appearance.font"
-      :brightness="settings.appearance.brightness"
+      :format="profile.format"
+      :show-date="profile.showDate"
+      :show-seconds="profile.showSeconds"
+      :theme="currentTheme"
+      :background-url="backgroundUrl"
+      :digit-url="digitUrl"
+      :layout="profile.digitLayout"
+      :show-colon="profile.showColon"
+      :font="profile.font"
+      :brightness="profile.brightness"
       variant="stage"
-      :scale="settings.appearance.clockScale"
-      :sound="settings.sound"
+      :scale="profile.clockScale"
+      :sound="profile.sound"
     />
   </div>
 </template>

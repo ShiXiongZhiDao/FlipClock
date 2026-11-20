@@ -1,6 +1,6 @@
 /** Rust 在窗口创建时注入的启动载荷，见 src-tauri/src/screensaver.rs。 */
 export interface BootPayload {
-  mode: "settings" | "screensaver" | "preview" | "clock";
+  mode: "settings" | "screensaver" | "preview" | "clock" | "theme-preview";
   exitOnInput: boolean;
   debugWindowed: boolean;
 }

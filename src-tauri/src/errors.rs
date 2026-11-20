@@ -46,6 +46,22 @@ pub enum AppError {
     AutostartExeFailed { detail: String },
     AutostartWriteFailed { key: String, detail: String },
     SetLocaleFailed { detail: String },
+    // 主题图片导入（ADR-0020）。三条拒绝理由分开，用户才知道该换图还是换格式。
+    //
+    // 变体上的 `rename_all` 只管变体名本身；结构体变体的**字段**要另写一次，
+    // 否则 `limit_mb` 会原样序列化成蛇形，而前端字典插值的是 `{limitMb}`——
+    // 用户看到的是没被替换的裸占位符。这条由 check-i18n-runtime 的占位符闸兜住。
+    #[serde(rename_all = "camelCase")]
+    ThemeImageTooLarge { limit_mb: u32 },
+    #[serde(rename_all = "camelCase")]
+    ThemeImageTooManyPixels { limit_side: u32 },
+    ThemeImageUnsupported { detail: String },
+    ThemeImageCopyFailed { detail: String },
+    ThemeDirUnavailable { detail: String },
+    InvalidThemeId { detail: String },
+    // 全屏配置窗口关不掉（ADR-0020 D19）。关窗失败必须留痕并回给调用方，
+    // 不能像以前那样吞掉失败、还照发「窗口已关闭」事件。
+    ThemePreviewCloseFailed { detail: String },
 }
 
 impl AppError {
@@ -97,5 +113,22 @@ mod tests {
         assert_eq!(value["key"], "https://evil.example");
         // 参数不能拼进 code 里，否则前端按 code 查表就失效了。
         assert_eq!(value.as_object().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn multi_word_fields_serialize_as_camel_case() {
+        // 枚举上的 `rename_all` 不作用于结构体变体的**字段**，所以每个带多词字段的
+        // 变体要自己再标一次。漏标时序列化出 `limit_mb`，而字典插值 `{limitMb}`，
+        // 用户看到的是裸占位符——这条测试就是为了让漏标在编译期就炸。
+        let raw = AppError::ThemeImageTooLarge { limit_mb: 32 }.as_string();
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("错误串应是 JSON");
+        assert_eq!(value["code"], "themeImageTooLarge");
+        assert_eq!(value["limitMb"], 32);
+        assert!(value.get("limit_mb").is_none(), "字段名必须是驼峰");
+
+        let raw = AppError::ThemeImageTooManyPixels { limit_side: 8192 }.as_string();
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("错误串应是 JSON");
+        assert_eq!(value["limitSide"], 8192);
+        assert!(value.get("limit_side").is_none(), "字段名必须是驼峰");
     }
 }

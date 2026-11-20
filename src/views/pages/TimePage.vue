@@ -1,236 +1,244 @@
 <script setup lang="ts">
-import FlipClock from "../../components/clock/FlipClock.vue";
-import { useClock } from "../../composables/useClock";
-import { useClockScale } from "../../composables/useClockScale";
-import { useSettings } from "../../composables/useSettings";
+import { useTheme } from "../../composables/useTheme";
 import { t } from "../../lib/i18n";
+import { themeLabel } from "../../lib/theme/labels";
 import type { DigitLayout, TimeFormat } from "../../types/settings";
 
-const { now } = useClock();
-const { settings } = useSettings();
-const { scalePercent, previewScale, SCALE_MIN, SCALE_MAX, SCALE_STEP } = useClockScale();
+const { current: currentTheme, profile } = useTheme();
 
 function setFormat(format: TimeFormat) {
-  settings.time.format = format;
+  profile.value.format = format;
 }
 
 function setLayout(layout: DigitLayout) {
-  settings.appearance.digitLayout = layout;
+  profile.value.digitLayout = layout;
 }
 </script>
 
 <template>
   <div class="time-page">
-    <section class="sample-card">
-      <div class="card-head">
-        <strong>{{ t("time.currentStyle") }}</strong>
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("time.format") }}</span>
+        <span class="section-note">{{ t("scope.currentTheme", { name: themeLabel(currentTheme) }) }}</span>
       </div>
-      <div class="stage">
-        <FlipClock
-          :now="now"
-          :format="settings.time.format"
-          :show-date="settings.time.showDate"
-          :show-seconds="settings.time.showSeconds"
-          :theme="settings.appearance.theme"
-          :layout="settings.appearance.digitLayout"
-          :show-colon="settings.time.showColon"
-          :font="settings.appearance.font"
-          :brightness="settings.appearance.brightness"
-          variant="panel"
-          :preview-scale="previewScale"
-        />
-      </div>
-    </section>
-
-    <aside class="card">
-      <div class="card-title">{{ t("time.format") }}</div>
-      <div class="segmented stretch">
+      <div class="segmented narrow">
         <button
           type="button"
-          :class="{ selected: settings.time.format === '24h' }"
+          :class="{ selected: profile.format === '24h' }"
           @click="setFormat('24h')"
         >
           {{ t("time.format24") }}
         </button>
         <button
           type="button"
-          :class="{ selected: settings.time.format === '12h' }"
+          :class="{ selected: profile.format === '12h' }"
           @click="setFormat('12h')"
         >
           {{ t("time.format12") }}
         </button>
       </div>
+    </section>
 
-      <div class="divider"></div>
-
-      <div class="row">
-        <div class="row-copy">
-          <span class="row-name">{{ t("time.showDate") }}</span>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.time.showDate"
-          :class="{ on: settings.time.showDate }"
-          @click="settings.time.showDate = !settings.time.showDate"
-        >
-          <i></i>
-        </button>
-      </div>
-
-      <div class="row">
-        <div class="row-copy">
-          <span class="row-name">{{ t("time.showSeconds") }}</span>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.time.showSeconds"
-          :class="{ on: settings.time.showSeconds }"
-          @click="settings.time.showSeconds = !settings.time.showSeconds"
-        >
-          <i></i>
-        </button>
-      </div>
-
-      <div class="row">
-        <div class="row-copy">
-          <span class="row-name">{{ t("time.showColon") }}</span>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.time.showColon"
-          :class="{ on: settings.time.showColon }"
-          @click="settings.time.showColon = !settings.time.showColon"
-        >
-          <i></i>
-        </button>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="layout-block">
-        <span class="row-name">{{ t("time.digitLayout") }}</span>
-        <div class="segmented stretch">
+    <section class="section">
+      <div class="section-title">{{ t("time.displayContent") }}</div>
+      <div class="lines">
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("time.showDate") }}</span>
+            <span class="row-hint">{{ t("time.showDateHint") }}</span>
+          </div>
           <button
             type="button"
-            :class="{ selected: settings.appearance.digitLayout === 'per-digit' }"
-            @click="setLayout('per-digit')"
+            class="switch"
+            role="switch"
+            :aria-checked="profile.showDate"
+            :class="{ on: profile.showDate }"
+            @click="profile.showDate = !profile.showDate"
           >
-            {{ t("time.layoutPerDigit") }}
+            <i></i>
           </button>
+        </div>
+
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("time.showSeconds") }}</span>
+          </div>
           <button
             type="button"
-            :class="{ selected: settings.appearance.digitLayout === 'per-pair' }"
-            @click="setLayout('per-pair')"
+            class="switch"
+            role="switch"
+            :aria-checked="profile.showSeconds"
+            :class="{ on: profile.showSeconds }"
+            @click="profile.showSeconds = !profile.showSeconds"
           >
-            {{ t("time.layoutPerPair") }}
+            <i></i>
+          </button>
+        </div>
+
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("time.showColon") }}</span>
+          </div>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            :aria-checked="profile.showColon"
+            :class="{ on: profile.showColon }"
+            @click="profile.showColon = !profile.showColon"
+          >
+            <i></i>
           </button>
         </div>
       </div>
+    </section>
 
-      <div class="scale-block">
-        <div class="scale-head">
-          <span class="row-name">{{ t("clock.scale") }}</span>
-          <span class="scale-value">{{ scalePercent }}%</span>
-        </div>
-        <input
-          v-model.number="scalePercent"
-          class="range"
-          type="range"
-          :min="SCALE_MIN"
-          :max="SCALE_MAX"
-          :step="SCALE_STEP"
-          :aria-label="t('clock.scaleAria')"
-        />
+    <section class="section">
+      <div class="section-title">{{ t("time.digitLayout") }}</div>
+      <div class="layouts">
+        <button
+          type="button"
+          class="layout-choice"
+          :class="{ active: profile.digitLayout === 'per-digit' }"
+          @click="setLayout('per-digit')"
+        >
+          <span class="layout-visual">
+            <span class="mini-card">1</span>
+            <span class="mini-card">0</span>
+            <span class="colon">:</span>
+            <span class="mini-card">2</span>
+            <span class="mini-card">4</span>
+          </span>
+          <span class="layout-name">{{ t("time.layoutPerDigit") }}</span>
+          <span class="layout-desc">{{ t("time.layoutPerDigitDesc") }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="layout-choice"
+          :class="{ active: profile.digitLayout === 'per-pair' }"
+          @click="setLayout('per-pair')"
+        >
+          <span class="layout-visual">
+            <span class="mini-card wide">10</span>
+            <span class="mini-card wide">24</span>
+          </span>
+          <span class="layout-name">{{ t("time.layoutPerPair") }}</span>
+          <span class="layout-desc">{{ t("time.layoutPerPairDesc") }}</span>
+        </button>
       </div>
-
-    </aside>
+    </section>
   </div>
 </template>
 
 <style scoped>
 .time-page {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(270px, 1fr);
-  gap: 16px;
-}
-
-.sample-card {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  background-color: var(--ui-surface);
-  background-image: var(--ui-sheen);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--ui-card-shadow);
-  overflow: hidden;
+  min-width: 0;
 }
 
-.card-head {
+.section-note {
+  font-size: 9.5px;
+  color: var(--ui-text-muted);
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 两个选项不需要铺满整行；铺满会让人以为还有第三个选项要选。 */
+.segmented.narrow {
+  align-self: flex-start;
+  /* 不设固定宽度：容器按按钮内容收缩，后面才不会多出一截空灰底。
+     早先写死 208/264px 是按"别铺满整行"来的，但 align-self:flex-start
+     本身就已经贴合内容，宽度反而成了多余的灰。 */
+  width: max-content;
+}
+
+.layouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.layout-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 11px 9px;
+  border: 1px solid var(--ui-divider);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  text-align: left;
+  color: var(--ui-text-secondary);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.layout-choice:hover {
+  border-color: #bdbab3;
+}
+
+.layout-choice.active {
+  border-color: var(--ui-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+.layout-visual {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 14px 16px 10px;
-  font-size: 12px;
+  justify-content: center;
+  gap: 3px;
+  height: 46px;
+  margin-bottom: 6px;
 }
 
-.stage {
+.mini-card {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 34px;
+  border-radius: 3px;
+  background: #37383c;
+  color: #f6f6f4;
+  font-family: var(--font-digit);
+  font-size: 16px;
+  line-height: 1;
   position: relative;
-  flex: 0 1 auto;
-  height: clamp(180px, 54%, 330px);
-  min-height: 180px;
-  margin: auto 14px;
-  border: 1px solid var(--ui-divider);
-  border-radius: var(--radius-card);
   overflow: hidden;
-  container-type: size;
 }
 
-.card {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ui-scroll) transparent;
+.mini-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.55);
 }
 
-.layout-block {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+.mini-card.wide {
+  width: 40px;
+  font-size: 18px;
 }
 
-.scale-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.scale-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.scale-value {
-  font-size: 10px;
+.colon {
+  font-size: 15px;
+  line-height: 1;
   color: var(--ui-text-muted);
-  font-variant-numeric: tabular-nums;
+  margin: 0 1px;
 }
 
-.range {
-  width: 100%;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--ui-accent);
-  cursor: default;
+.layout-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.layout-desc {
+  font-size: 9.5px;
+  color: var(--ui-text-muted);
 }
 </style>

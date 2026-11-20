@@ -36,7 +36,16 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        // 匿名使用统计（ADR-0019）。App Key 由构建环境注入；未配置时传空串，
+        // 插件会静默禁用所有事件。这样开源仓库不需要藏 key，本地开发不发数据。
+        .plugin(
+            tauri_plugin_aptabase::Builder::new(
+                option_env!("FLIPCLOCK_APTABASE_KEY").unwrap_or(""),
+            )
+            .build(),
+        );
     if !is_saver && !is_headless_restore {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             let _ = screensaver::open_settings_window(app);
@@ -46,6 +55,8 @@ pub fn run() {
     builder
         .setup(move |app| {
             let handle = app.handle().clone();
+
+
             let loaded = settings::load(&handle);
             let no_arg_mode = loaded.launch.no_arg_mode;
             let debug_windowed = args.debug_windowed;
@@ -141,6 +152,13 @@ pub fn run() {
             commands::set_autostart,
             commands::ui_ready,
             commands::set_locale,
+            commands::open_theme_preview,
+            commands::get_theme_preview,
+            commands::close_theme_preview,
+            commands::themes_dir_path,
+            commands::import_theme_image,
+            commands::remove_theme_image,
+            commands::delete_theme_dir,
         ])
         .build(tauri::generate_context!())
         .expect("error while running FlipClock")

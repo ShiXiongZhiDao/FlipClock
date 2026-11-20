@@ -9,8 +9,7 @@ use crate::install::{self, ScreenSaverStatus};
 use crate::screensaver::{self, AppState};
 use crate::errors::AppError;
 use crate::settings::{
-    self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SoundSettings, SystemSettings,
-    TimeSettings, UiSettings,
+    self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SystemSettings, UiSettings,
 };
 
 /// 前端只能改这几段。注册信息（回滚点、安装路径）由后端独占，
@@ -19,8 +18,6 @@ use crate::settings::{
 #[serde(rename_all = "camelCase")]
 pub struct SettingsPatch {
     pub appearance: Appearance,
-    pub time: TimeSettings,
-    pub sound: SoundSettings,
     pub screensaver: ScreenSaverSettings,
     pub launch: LaunchSettings,
     pub system: SystemSettings,
@@ -87,14 +84,9 @@ pub async fn save_settings(
         .map_err(|_| String::from(AppError::ConfigUnavailable))?;
 
     guard.appearance = patch.appearance;
-    // 前端滑杆限了范围，这里再兜一次；边界只来自 settings::clamp_*。
-    guard.appearance.glass.transparency =
-        settings::clamp_glass(guard.appearance.glass.transparency);
-    guard.appearance.clock_scale = settings::clamp_clock_scale(guard.appearance.clock_scale);
-    guard.appearance.brightness = settings::clamp_brightness(guard.appearance.brightness);
-    guard.time = patch.time;
-    guard.sound = patch.sound;
-    guard.sound.volume = settings::clamp_sound_volume(guard.sound.volume);
+    // 自定义主题在这里收敛：截断数量、丢弃非法项、clamp 不透明度、修正悬空 id，
+    // 并补齐每个主题的钟面配置（ADR-0022）。
+    settings::normalize_appearance(&mut guard.appearance);
     guard.screensaver = patch.screensaver;
     guard.launch = patch.launch;
     guard.system = patch.system;
@@ -193,10 +185,172 @@ pub async fn leave_fullscreen_clock(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/* ------------------------------- 主题图片（ADR-0020） ------------------------------ */
+
+/// 主题图片上限。32MB 是文件大小；解码后的内存通常是它的三到四倍，
+/// 屏保在多显示器上还会同时加载，所以另有单边像素上限。
+const THEME_IMAGE_MAX_BYTES: u64 = 32 * 1024 * 1024;
+const THEME_IMAGE_MAX_SIDE: u32 = 8192;
+
+/// 主题 id 会被拼进文件路径，必须只允许小写字母、数字与连字符：
+/// 这条同时挡住 `..`、斜杠与盘符。判据在 settings 里，配置校验与图片导入共用一份。
+fn is_safe_kind(kind: &str) -> bool {
+    matches!(kind, "background" | "digit")
+}
+
+/// 打开主题编辑的全屏预览窗口。
+///
+/// **必须是 async**：同步命令跑在 Tauri 主线程上，而建窗口要等主线程回到事件循环，
+/// `WebviewWindowBuilder::build()` 会原地死锁——表现就是「点一下，整个应用卡住」。
+/// 同一个坑 `preview_screensaver` 上面已经踩过一次并留了注释。
+#[tauri::command]
+pub async fn open_theme_preview(app: AppHandle, payload: String) -> Result<(), String> {
+    screensaver::open_theme_preview(&app, payload)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_theme_preview() -> Result<Option<String>, String> {
+    // 预览窗口被直接关掉再打开时可能读不到草稿，返回 None 让前端自己退出。
+    Ok(screensaver::take_theme_preview())
+}
+
+/// 关窗同样走 async：销毁窗口也要事件循环参与。
+#[tauri::command]
+pub async fn close_theme_preview(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(screensaver::MODE_THEME_PREVIEW) {
+        // 关窗失败不能吞：以前这里是 `let _ = window.close()`，失败后照样发
+        // theme-preview-closed，前端于是 resetStudio() 把草稿清了——窗口却留在
+        // 屏上。用户看到的是「点了没反应」，丢掉的却是整场草稿。
+        // 见 ADR-0020 D19「创建与关闭失败都必须留痕」。
+        if let Err(error) = window.close() {
+            eprintln!("FlipClock: 关闭全屏配置窗口失败 {error}");
+            return Err(AppError::ThemePreviewCloseFailed {
+                detail: error.to_string(),
+            }
+            .into());
+        }
+    }
+    // 事件只在窗口确实关掉之后发。提前发等于对设置窗口撒谎：它会白刷一次配置，
+    // 而预览窗口还在最前面。
+    let _ = app.emit("theme-preview-closed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn themes_dir_path(app: AppHandle) -> Result<String, String> {
+    let dir = settings::themes_dir(&app)?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// 把用户选中的图片复制进主题目录，返回文件名（配置文件里只存文件名）。
+#[tauri::command]
+pub fn import_theme_image(
+    app: AppHandle,
+    theme_id: String,
+    source_path: String,
+    kind: String,
+) -> Result<String, String> {
+    if !settings::is_safe_theme_id(&theme_id) {
+        return Err(AppError::InvalidThemeId { detail: theme_id }.into());
+    }
+    if !is_safe_kind(&kind) {
+        return Err(AppError::ThemeImageUnsupported { detail: kind }.into());
+    }
+
+    let source = std::path::Path::new(&source_path);
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .ok_or_else(|| AppError::ThemeImageUnsupported {
+            detail: String::from("no-extension"),
+        })?;
+    if !matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+        return Err(AppError::ThemeImageUnsupported { detail: extension }.into());
+    }
+
+    let meta = std::fs::metadata(source).map_err(|error| AppError::ThemeImageUnsupported {
+        detail: error.to_string(),
+    })?;
+    if meta.len() > THEME_IMAGE_MAX_BYTES {
+        return Err(AppError::ThemeImageTooLarge { limit_mb: 32 }.into());
+    }
+
+    // 只读文件头拿尺寸，不解码整张图。
+    match image::image_dimensions(source) {
+        Ok((width, height)) if width.max(height) > THEME_IMAGE_MAX_SIDE => {
+            return Err(AppError::ThemeImageTooManyPixels {
+                limit_side: THEME_IMAGE_MAX_SIDE,
+            }
+            .into())
+        }
+        Ok(_) => {}
+        Err(error) => {
+            return Err(AppError::ThemeImageUnsupported {
+                detail: error.to_string(),
+            }
+            .into())
+        }
+    }
+
+    let dir = settings::themes_dir(&app)?.join(&theme_id);
+    std::fs::create_dir_all(&dir).map_err(|error| AppError::ThemeImageCopyFailed {
+        detail: error.to_string(),
+    })?;
+
+    // 文件名带时间戳：换图时不覆盖旧文件，缓存也不会指向同一个名字。
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_millis())
+        .unwrap_or(0);
+    let name = format!("{kind}-{stamp}.{extension}");
+    std::fs::copy(source, dir.join(&name)).map_err(|error| AppError::ThemeImageCopyFailed {
+        detail: error.to_string(),
+    })?;
+    Ok(name)
+}
+
+#[tauri::command]
+pub fn remove_theme_image(
+    app: AppHandle,
+    theme_id: String,
+    filename: String,
+) -> Result<(), String> {
+    if !settings::is_safe_theme_id(&theme_id) {
+        return Err(AppError::InvalidThemeId { detail: theme_id }.into());
+    }
+    if !settings::is_image_name(&filename) {
+        return Err(AppError::ThemeImageUnsupported { detail: filename }.into());
+    }
+    let path = settings::themes_dir(&app)?.join(&theme_id).join(&filename);
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|error| AppError::ThemeImageCopyFailed {
+            detail: error.to_string(),
+        })?;
+    }
+    Ok(())
+}
+
+/// 删除整个主题目录。删主题时必须调，否则图片会变成孤儿文件。
+#[tauri::command]
+pub fn delete_theme_dir(app: AppHandle, theme_id: String) -> Result<(), String> {
+    if !settings::is_safe_theme_id(&theme_id) {
+        return Err(AppError::InvalidThemeId { detail: theme_id }.into());
+    }
+    let dir = settings::themes_dir(&app)?.join(&theme_id);
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).map_err(|error| AppError::ThemeImageCopyFailed {
+            detail: error.to_string(),
+        })?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::DigitLayout;
+    use crate::settings::{DigitFont, DigitLayout};
 
     /// 前端发来的 patch 形状是手写 JSON，字段名或枚举值错一个就会静默回默认值，
     /// 所以这里把线上的实际载荷形态钉住。
@@ -205,19 +359,20 @@ mod tests {
         let raw = serde_json::json!({
             "appearance": {
                 "theme": "classic-dark",
-                "glass": { "transparency": 0.48 },
-                "clockScale": 1.0,
-                "digitLayout": "per-pair",
-                "brightness": 0.75,
-                "font": "bahnschrift"
+                "profiles": {
+                    "classic-dark": {
+                        "format": "12h",
+                        "showDate": true,
+                        "showSeconds": false,
+                        "showColon": true,
+                        "digitLayout": "per-pair",
+                        "font": "bahnschrift",
+                        "clockScale": 1.0,
+                        "brightness": 0.75,
+                        "sound": { "enabled": true, "volume": 0.6 }
+                    }
+                }
             },
-            "time": {
-                "format": "24h",
-                "showDate": true,
-                "showSeconds": false,
-                "showColon": true
-            },
-            "sound": { "enabled": true, "volume": 0.6 },
             "screensaver": { "monitorMode": "primary" },
             "launch": { "noArgMode": "settings" },
             "system": { "closeToTray": false },
@@ -225,9 +380,11 @@ mod tests {
         });
 
         let patch: SettingsPatch = serde_json::from_value(raw).expect("patch 载荷应能反序列化");
-        assert_eq!(patch.appearance.digit_layout, DigitLayout::PerPair);
-        assert_eq!(patch.appearance.font, crate::settings::DigitFont::Bahnschrift);
-        assert!(patch.time.show_colon);
+        let profile = &patch.appearance.profiles["classic-dark"];
+        assert_eq!(profile.format, crate::settings::TimeFormat::H12);
+        assert_eq!(profile.digit_layout, DigitLayout::PerPair);
+        assert_eq!(profile.font, DigitFont::Bahnschrift);
+        assert!(profile.show_colon);
         assert!(!patch.system.close_to_tray);
         assert_eq!(patch.ui.language, crate::settings::LanguagePreference::System);
     }

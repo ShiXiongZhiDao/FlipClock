@@ -1,27 +1,53 @@
-/* 设置界面里反复出现的控件：分段选择、开关、按钮、行、徽标。
-   放在全局而不是每个页面各写一遍，避免四份样式慢慢漂移。 */
+/* 设置界面里反复出现的控件：段落、分段选择、开关、按钮、行、徽标。
+   放在全局而不是每个页面各写一遍，避免五份样式慢慢漂移。
 
-.card {
-  background-color: var(--ui-surface);
-  background-image: var(--ui-sheen);
-  border: 1px solid var(--ui-divider);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--ui-card-shadow, none);
-  padding: 18px 20px;
+   段落不是卡片：没有底色、没有圆角、没有投影，只用一条下划线收尾。
+   一屏里堆四五张白卡会让人以为每张都要单独保存。
+
+   圆角只有 4px，描边只有 1px，选中态只有「墨色描边」一种表达——
+   整个界面不需要第二种「选中」语汇。 */
+
+.section {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 11px;
   min-width: 0;
+  padding: 0 0 15px;
+  margin: 0 0 15px;
+  border-bottom: 1px solid var(--ui-divider);
+  /* 全局 body 的 line-height:1.5 在 13px 字号下算出 19.5px，
+     段落内元素高度累加出 .75/.5，让 1px 分割线落在半像素上被抗锯齿成 2px。
+     钉成整数行高后所有子项回到整数高度，分割线干净地渲染成 1px。 */
+  line-height: 20px;
 }
 
-.card-title {
+.section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.section button {
+  line-height: 20px;
+}
+
+/* 标题行：左边段落名，右边一个轻量动作（状态徽标、文字链） */
+.section-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  min-height: 18px;
+}
+
+/* 段落名是「表单分组标签」，不是标题：小一号、字距略开、颜色比正文浅。
+   中文加字距会显得刻意——这正是它的作用：一看就知道这是被人排过的，
+   不是排版引擎按默认值堆出来的。 */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #6f6c65;
 }
 
 .row {
@@ -35,7 +61,7 @@
 .row-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -44,25 +70,47 @@
   color: var(--ui-text);
 }
 
+.row-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+
 .divider {
   height: 1px;
   background: var(--ui-divider);
   margin: 1px -1px;
 }
 
-/* 分段选择 */
+/* 一组同质的设置行：行与行之间一条细线，行内不重复画分割线。
+   行距紧凑到能一眼扫完，而不是每行一块卡片。 */
+.lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.lines > .row {
+  min-height: 40px;
+  padding: 5px 0;
+}
+
+.lines > .row + .row {
+  border-top: 1px solid var(--ui-divider);
+}
+
+/* 分段选择：轨道比底色深半档，选中块是纯白 + 一道极浅投影。
+   不用彩色，也不做滑动胶囊——那是移动端的语汇。 */
 .segmented {
   display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--ui-track, var(--ui-bg));
-  border: 1px solid var(--ui-divider);
+  gap: 1px;
+  padding: 2px;
+  background: var(--ui-track);
   border-radius: var(--radius-control);
   flex: none;
 }
 
-/* .stretch 只负责横向铺满，不能写成 flex:1 —— 卡片是竖向 flex，
-   flex:1 会让分段控件在竖直方向吃掉整个卡片高度。 */
+/* .stretch 只负责横向铺满，不能写成 flex:1 —— 段落是竖向 flex，
+   flex:1 会让分段控件在竖直方向吃掉整个段落高度。 */
 .segmented.stretch {
   flex: none;
   width: 100%;
@@ -73,12 +121,12 @@
 }
 
 .segmented button {
-  padding: 6px 11px;
+  padding: 5px 10px;
   font-size: 10.5px;
-  color: var(--ui-text-muted);
-  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  border-radius: 3px;
   white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .segmented button:hover {
@@ -86,100 +134,254 @@
 }
 
 .segmented button.selected {
-  background: var(--ui-thumb, var(--ui-surface-2));
+  background: var(--ui-thumb);
   color: var(--ui-text);
-  box-shadow: var(--ui-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.22));
+  font-weight: 600;
+  box-shadow: var(--ui-thumb-shadow);
 }
 
-/* 开关 */
+/* 开关：关是暖灰轨，开是墨色轨。 */
 .switch {
-  width: var(--ui-switch-w, 36px);
-  height: var(--ui-switch-h, 20px);
+  width: var(--ui-switch-w);
+  height: var(--ui-switch-h);
   flex: none;
-  padding: var(--ui-switch-pad, 2px);
+  padding: var(--ui-switch-pad);
   border-radius: 20px;
-  background: var(--ui-track, var(--ui-surface-2));
+  background: #d5d2cc;
   transition: background 0.18s ease;
 }
 
 .switch i {
   display: block;
-  width: var(--ui-knob, 16px);
-  height: var(--ui-knob, 16px);
+  width: var(--ui-knob);
+  height: var(--ui-knob);
   border-radius: 50%;
-  background: var(--ui-knob-off, #9ba09d);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 0.18s ease, background 0.18s ease;
+  background: var(--ui-knob-off);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  transition: transform 0.18s ease;
 }
 
 .switch.on {
-  background: var(--ui-switch-on, var(--ui-accent));
+  background: var(--ui-switch-on);
 }
 
 .switch.on i {
-  transform: translateX(var(--ui-knob-travel, 16px));
-  background: var(--ui-knob-on, #211e18);
+  transform: translateX(var(--ui-knob-travel));
 }
 
-/* 按钮 */
+.switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 按钮：主操作墨底白字，其余白底细边。圆角只有 4px，别做出胶囊感。 */
 .primary,
 .secondary {
-  padding: 9px 16px;
-  font-size: 11px;
-  border-radius: 999px;
-  transition: 0.16s ease;
+  padding: 6px 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: var(--radius-card);
   white-space: nowrap;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
 .primary {
-  background: var(--ui-primary-bg, var(--ui-accent));
-  color: var(--ui-primary-ink, var(--ui-accent-ink));
-  font-weight: 700;
-  border: 1px solid var(--ui-primary-border, var(--ui-accent-line));
-  box-shadow: var(--ui-primary-shadow, none);
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  border: 1px solid var(--ui-accent);
 }
 
 .primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: #33332f;
+  border-color: #33332f;
 }
 
 .secondary {
-  border: 1px solid var(--ui-divider);
-  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
   color: var(--ui-text);
 }
 
 .secondary:hover:not(:disabled) {
-  border-color: var(--ui-accent-line);
+  background: var(--ui-surface-2);
 }
 
 .primary:disabled,
 .secondary:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: default;
 }
 
-/* 提示与标签 */
-.stage,
-.theme-stage {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-    0 18px 40px -14px rgba(30, 55, 44, 0.38);
+/* 滑杆：4px 轨道 + 12px 白钮墨边。原生 accent-color 会给一条 8px 的
+   彩色粗条——那是整个界面里最像「网页默认控件」的地方，必须自绘。
+   16px 输入高 - 4px 轨道 = 上下各 6px，全整数偏移；14px + 3px 会得到
+   5.5px 的偏移，亚像素取整后同一页两条轨道会一粗一细。
+   --fill 由各页面按当前值算好传进来。 */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  cursor: default;
 }
 
-/* 深色时钟面板上盖一层极淡反光，让它像被玻璃罩住的屏幕，而不是一块黑洞 */
-.stage::after,
-.theme-stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
   background: linear-gradient(
-    128deg,
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(255, 255, 255, 0.06) 18%,
-    rgba(255, 255, 255, 0) 42%
+    to right,
+    var(--ui-accent) 0 var(--fill, 50%),
+    var(--ui-track) var(--fill, 50%) 100%
   );
+}
+
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid var(--ui-accent);
+}
+
+.range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* 滑杆一行的抬头：左边名字，右边数值 */
+.range-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.range-value {
+  font-size: 10px;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.range-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #9a978f;
+  margin-top: 2px;
+}
+
+/* 状态徽标：一个点 + 一句话，不占底色 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b3b0a9;
+}
+
+.badge.ok {
+  color: var(--ui-success);
+}
+
+.badge.ok::before {
+  background: var(--ui-success);
+}
+
+.badge.warn {
+  color: var(--ui-warn);
+}
+
+.badge.warn::before {
+  background: var(--ui-warn);
+}
+
+.badge.err {
+  color: var(--ui-danger);
+}
+
+.badge.err::before {
+  background: var(--ui-danger);
+}
+
+/* 时钟舞台：钟面自己带底色，这里只给一圈细边把它和界面分开。
+   不加内高光、不加外投影——预览是预览，不是展示柜。 */
+.stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ui-divider-strong);
+  border-radius: var(--radius-panel);
+  container-type: size;
+}
+
+/* 主题样卡：一整块该主题的颜色 + 缩略钟面 + 名字。
+   设置页的主题墙与全屏配置的主题墙共用这一份——两边各画一套的结果是，
+   改完一边另一边不跟，用户看到的「卡片长得不一样」永远修不完。
+
+   底色与文字色由 swatchStyle() 以内联样式注入（卡面渲染色 + 数字色），
+   所以这里不设 background / color，只负责形状与排版。 */
+.theme-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  text-align: left;
+  /* 边框保留但透明：选中态只改颜色，增删 1px 不会让整格跳动。 */
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: box-shadow 0.12s ease;
+}
+
+/* 钟面那一格：不要 `.stage` 的细边——样卡本身就是一块颜色，
+   再套一条线就成了「框中框」。container-type 仍由 .stage 提供。 */
+.theme-sample-stage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2.3;
+  border: 0;
+  border-radius: 2px;
+}
+
+.theme-sample-name {
+  font-size: 10.5px;
+  /* 继承注入的数字色：深色主题卡上是亮字、浅金卡上是深棕。 */
+  color: inherit;
+  opacity: 0.82;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-sample-summary {
+  max-width: 100%;
+  font-size: 8.5px;
+  color: inherit;
+  opacity: 0.62;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 选中：白缝 + 墨环。单条 1px 墨边压在近黑主题卡上看不见，
+   而卡片的颜色是用户自己选的，不能指望它配合墨色。 */
+.theme-sample.is-active {
+  box-shadow:
+    0 0 0 2px var(--ui-surface),
+    0 0 0 4px var(--ui-accent);
 }
 
 .mono-path {
@@ -187,8 +389,4 @@
   font-size: 10px;
   color: var(--ui-text-muted);
   word-break: break-all;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--ui-bg);
-  border: 1px solid var(--ui-divider);
 }

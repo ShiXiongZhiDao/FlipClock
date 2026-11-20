@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import FlipClock from "../components/clock/FlipClock.vue";
 import { useClock } from "../composables/useClock";
 import { useSettings } from "../composables/useSettings";
+import { useTheme } from "../composables/useTheme";
 
 /**
  * 系统预览的框只有约 150×110 逻辑像素。
@@ -14,7 +15,8 @@ const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
 
 const { now } = useClock();
-const { settings, load } = useSettings();
+const { load } = useSettings();
+const { current: currentTheme, profile, backgroundUrl, digitUrl } = useTheme();
 const scale = ref(0.1);
 
 function fit() {
@@ -45,14 +47,16 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
     >
       <FlipClock
         :now="now"
-        :format="settings.time.format"
-        :show-date="settings.time.showDate"
-        :show-seconds="settings.time.showSeconds"
-        :theme="settings.appearance.theme"
-        :layout="settings.appearance.digitLayout"
-        :show-colon="settings.time.showColon"
-        :font="settings.appearance.font"
-        :brightness="settings.appearance.brightness"
+        :format="profile.format"
+        :show-date="profile.showDate"
+        :show-seconds="profile.showSeconds"
+        :theme="currentTheme"
+        :background-url="backgroundUrl"
+        :digit-url="digitUrl"
+        :layout="profile.digitLayout"
+        :show-colon="profile.showColon"
+        :font="profile.font"
+        :brightness="profile.brightness"
         variant="thumb"
       />
     </div>

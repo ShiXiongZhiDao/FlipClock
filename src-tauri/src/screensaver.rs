@@ -15,6 +15,13 @@ use crate::platform;
 use crate::settings::{MonitorMode, Settings};
 
 pub const MODE_SETTINGS: &str = "settings";
+/// 主题编辑的独立预览窗口。**创建时就建成全屏**，不做任何运行时窗口状态切换——
+/// 这是唯一在本机能稳定生效的窗口尺寸路径。
+pub const MODE_THEME_PREVIEW: &str = "theme-preview";
+
+/// 全屏配置要编辑的整份快照（JSON，ADR-0022）。
+/// 跨窗口传不了 Vue 的响应式对象，这里存一份原始 JSON 给新窗口自取。
+static PREVIEW_DRAFT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 pub const MODE_SCREENSAVER: &str = "screensaver";
 pub const MODE_CLOCK: &str = "clock";
 
@@ -27,7 +34,7 @@ const DISPLAY_POLL_INTERVAL: Duration = Duration::from_millis(1500);
 
 /// 设置窗口外壳的圆角（逻辑像素）。必须与 `src/styles/tokens.css` 的
 /// `--radius-shell` 一致：窗口区域和 CSS 圆角是同一个形状，改一个就得改另一个。
-const SHELL_RADIUS: f64 = 18.0;
+const SHELL_RADIUS: f64 = 13.0;
 
 /// 沉浸窗口的 WebView2 参数。
 ///
@@ -105,6 +112,88 @@ fn settings_window_size(app: &AppHandle) -> (f64, f64) {
         IDEAL.0.min((logical_w * 0.94).round()),
         IDEAL.1.min((logical_h * 0.94).round()),
     )
+}
+
+/// 打开全屏配置窗口：整屏、无边框、置顶、不占任务栏。
+///
+/// 尺寸在**创建时**给定，之后不再调整。前面几版都试图在运行时把设置窗口
+/// 撑成全屏（set_fullscreen / SetWindowPos / maximize），在你的机器上全部
+/// 「报告成功但画面不变」；而窗口创建参数从来没失败过。
+pub fn open_theme_preview(app: &AppHandle, payload: String) -> Result<(), AppError> {
+    // GUI 子系统没有控制台，eprintln 会被静默丢弃。预览窗口打不开是用户
+    // 能感知、开发者却看不到的问题，调试版留一份落盘痕迹（正式版不写）。
+    preview_diag(format!("called payload_len={}", payload.len()));
+
+    if let Some(existing) = app.get_webview_window(MODE_THEME_PREVIEW) {
+        let _ = existing.close();
+    }
+    if let Ok(mut slot) = PREVIEW_DRAFT.lock() {
+        *slot = Some(payload);
+    }
+
+    let monitor = app
+        .primary_monitor()
+        .map_err(|error| AppError::ReadPrimaryMonitorFailed {
+            detail: error.to_string(),
+        })?
+        .ok_or(AppError::NoMonitor)?;
+    let scale = monitor.scale_factor();
+    let size = monitor.size().to_logical::<f64>(scale);
+    let origin = monitor.position().to_logical::<f64>(scale);
+
+    let window = WebviewWindowBuilder::new(
+        app,
+        MODE_THEME_PREVIEW,
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("FlipClock")
+    .decorations(false)
+    .inner_size(size.width, size.height)
+    .position(origin.x, origin.y)
+    // 创建时就置顶：这是盖住任务栏的唯一可靠时机。
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .maximizable(false)
+    .shadow(false)
+    // 创建即可见：先 visible(false) 再 show() 是为了避免白闪，但 show 失败时
+    // 窗口就永远不出现——用户只会看到「点了没反应」。宁可闪一下。
+    .visible(true)
+    .initialization_script(boot_script(&BootPayload {
+        mode: MODE_THEME_PREVIEW,
+        exit_on_input: false,
+        debug_windowed: false,
+    }))
+    .build()
+    .map_err(|error| AppError::CreateWindowFailed {
+        label: String::from(MODE_THEME_PREVIEW),
+        detail: error.to_string(),
+    })?;
+
+    let _ = window.set_focus();
+    preview_diag(format!(
+        "built size={:?} visible={:?}",
+        window.inner_size().ok(),
+        window.is_visible().ok()
+    ));
+    Ok(())
+}
+
+/// 预览窗口的诊断落盘。只在调试构建里生效，正式版是空函数。
+#[cfg(debug_assertions)]
+fn preview_diag(message: String) {
+    let _ = std::fs::write(
+        std::env::temp_dir().join("fc-open-preview.log"),
+        message,
+    );
+}
+
+#[cfg(not(debug_assertions))]
+fn preview_diag(_message: String) {}
+
+/// 取走预览草稿。只给新窗口读一次——读完即清，避免第二次打开读到旧主题。
+pub fn take_theme_preview() -> Option<String> {
+    PREVIEW_DRAFT.lock().ok().and_then(|mut slot| slot.take())
 }
 
 fn boot_script(payload: &BootPayload) -> String {
@@ -407,8 +496,9 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, MODE_SETTINGS, WebviewUrl::App("index.html".into()))
         .title("FlipClock")
         .inner_size(width, height)
-        .min_inner_size(width, height)
-        .max_inner_size(width, height);
+        // 只留一个下限，不再锁死上限：编辑主题时要能铺满屏幕看效果。
+        // 「不能最大化」仍然保留——设置页不该有最大化按钮，放大由编辑态自己接管。
+        .min_inner_size(1000.0, 640.0);
 
     let builder = match WINDOW_AT.get() {
         Some((x, y)) => builder.position(*x, *y),
@@ -417,9 +507,10 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
 
     let window = builder
         // 自绘标题栏：去掉原生边框，交通灯和拖拽区都在前端。
-        // 代价是没有边缘缩放和 Win11 贴靠布局，所以窗口直接固定尺寸。
+        // 代价是没有 Win11 贴靠布局，所以不做最大化按钮；但尺寸不再固定，
+        // 编辑主题时需要把窗口撑到整屏。
         .decorations(false)
-        .resizable(false)
+        .resizable(true)
         .maximizable(false)
         .theme(Some(tauri::Theme::Light))
         // 无边框窗口的原生影子不是 DWM 直接画的，而是 tao 把窗口向外扩 8px、

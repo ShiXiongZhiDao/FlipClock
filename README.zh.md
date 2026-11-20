@@ -33,7 +33,7 @@ FlipClock 把 Windows 桌面变成一台机械翻页钟。每位数字住在一�
 - **不是网页**：它是原生 Windows 应用，时钟界面在本地 WebView2 中运行。
 - **不是闹钟、计时器或日历**：它只报时间，可选显示日期，不会响铃提醒。
 - **不是锁屏替代品**：它是你在 Windows 屏保设置里选定的屏保，另有一个需要自己启动的全屏模式。
-- **不是云服务**：没有账号、没有同步、没有遥测。唯一的外出请求是可选的更新检查。
+- **不是云服务**：没有账号、没有同步、没有云存储。
 - **不是跨平台软件**：仅支持 Windows 10/11 x64。Windows 系统预览钩子（`/p <HWND>`）明确不支持：进程不创建窗口直接退出。
 
 ## 为什么做这个
@@ -56,21 +56,18 @@ FlipClock 把 Windows 桌面变成一台机械翻页钟。每位数字住在一�
 
 上面两张全屏图是两种数字排布。**v1.0.0 的设置界面为中文**；下面几张图只为说明有哪些可调项，英文界面计划在后续版本提供。
 
-| 时钟预览 | 外观主题 |
+| 外观主题 | 时间与日期 |
 | --- | --- |
-| <img src="./assets/screenshots/zh/clock-preview.jpg" alt="时钟预览设置页" width="700"> | <img src="./assets/screenshots/zh/appearance.jpg" alt="外观主题设置页" width="700"> |
+| <img src="./assets/screenshots/zh/appearance.jpg" alt="外观主题设置页" width="700"> | <img src="./assets/screenshots/zh/time-and-date.jpg" alt="时间与日期设置页" width="700"> |
 
-| 时间与日期 | 全屏时钟 |
+| 声音 | 全屏时钟 |
 | --- | --- |
-| <img src="./assets/screenshots/zh/time-and-date.jpg" alt="时间与日期设置页" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="全屏翻页时钟" width="700"> |
+| <img src="./assets/screenshots/zh/sound.jpg" alt="声音设置页" width="700"> | <img src="./assets/screenshots/clock-per-pair.jpg" alt="全屏翻页时钟" width="700"> |
 
 ## 隐私与边界
 
-- FlipClock 完全本地运行，没有账号体系、没有统计、没有遥测。
-- 唯一的外出请求是「系统 → 关于」里**由你主动触发**的更新检查：先问 Gitee，再问 GitHub；不点检查就不会发请求。
-- 更新包用 minisign 签名，安装器验签后才应用更新。
-- 设置按用户存储；屏保组件也按当前用户安装，从不碰 `System32`。
-- 时钟不访问摄像头、麦克风、文件内容或剪贴板。
+- 不收集用户隐私信息。
+- 不访问摄像头、麦克风、文件内容或剪贴板。
 
 ## 怎么装
 

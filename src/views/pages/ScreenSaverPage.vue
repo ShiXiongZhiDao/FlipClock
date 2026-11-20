@@ -3,11 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { computed, onMounted, ref } from "vue";
 
 import { useSettings } from "../../composables/useSettings";
+import { trackFeatureToggled } from "../../lib/analytics";
 import { isTauri } from "../../lib/env";
 import { errorText, t, type MessageKey } from "../../lib/i18n";
 import type {
   MonitorMode,
-  NoArgMode,
   RegistrationState,
   ScreenSaverStatus,
 } from "../../types/settings";
@@ -53,6 +53,7 @@ async function install() {
   busy.value = true;
   try {
     status.value = await invoke<ScreenSaverStatus>("install_screensaver");
+    trackFeatureToggled("screensaver", true);
     notify("ok", t("saver.installToast"));
   } catch (e) {
     notify("err", errorText(e));
@@ -65,6 +66,7 @@ async function restore() {
   busy.value = true;
   try {
     status.value = await invoke<ScreenSaverStatus>("restore_screensaver");
+    trackFeatureToggled("screensaver", false);
     notify("ok", t("saver.restoreToast"));
   } catch (e) {
     notify("err", errorText(e));
@@ -85,51 +87,67 @@ function setMonitorMode(mode: MonitorMode) {
   settings.screensaver.monitorMode = mode;
 }
 
-function setNoArgMode(mode: NoArgMode) {
-  settings.launch.noArgMode = mode;
-}
-
 onMounted(refresh);
 </script>
 
 <template>
   <div class="saver-page">
-    <section class="card main">
-      <div class="card-title">
-        {{ t("saver.windowsTitle") }}
-        <span v-if="statusInfo" class="status" :class="statusInfo.tone">
-          {{ statusInfo.label }}
-        </span>
-      </div>
+    <section class="hero">
+      <span class="hero-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M8 21h8M12 17v4M12 7v4l2.5 1.5" />
+        </svg>
+      </span>
+      <span class="hero-copy">
+        <strong>{{ t("saver.productTitle") }}</strong>
+        <small>{{ t("saver.productDesc") }}</small>
+      </span>
+      <span v-if="statusInfo" class="badge" :class="statusInfo.tone">{{ statusInfo.label }}</span>
+      <button class="primary" type="button" :disabled="busy" @click="install">
+        {{ t(deployed ? "saver.redeploy" : "saver.installShort") }}
+      </button>
+    </section>
 
-      <div class="actions">
-        <button class="primary" type="button" :disabled="busy" @click="install">
-          {{ t(deployed ? "saver.redeploy" : "saver.install") }}
-        </button>
-        <button class="secondary" type="button" @click="openSystemSettings">
-          {{ t("saver.openSettings") }}
+    <Transition name="msg">
+      <p v-if="message" class="msg" :class="message.tone">{{ message.text }}</p>
+    </Transition>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("saver.monitorTitle") }}</span>
+      </div>
+      <div class="segmented narrow">
+        <button
+          type="button"
+          :class="{ selected: settings.screensaver.monitorMode === 'primary' }"
+          @click="setMonitorMode('primary')"
+        >
+          {{ t("saver.monitorPrimary") }}
         </button>
         <button
-          v-if="status?.rollbackAvailable"
-          class="secondary"
           type="button"
-          :disabled="busy"
-          @click="restore"
+          :class="{ selected: settings.screensaver.monitorMode === 'all' }"
+          @click="setMonitorMode('all')"
         >
-          {{ t("saver.restoreOriginal") }}
+          {{ t("saver.monitorAll") }}
+        </button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("saver.details") }}</span>
+        <button type="button" class="mini" @click="openSystemSettings">
+          {{ t("saver.openSettings") }}
         </button>
       </div>
 
-      <Transition name="msg">
-        <div v-if="message" class="msg" :class="message.tone">{{ message.text }}</div>
-      </Transition>
-
-      <div class="divider"></div>
-
       <div class="kv">
-        <span>{{ t("saver.currentTarget") }}</span>
+        <span class="kv-key">{{ t("saver.currentTarget") }}</span>
         <span class="kv-value">{{ status?.activePath || t("saver.notSet") }}</span>
-        <span>{{ t("saver.componentVersion") }}</span>
+
+        <span class="kv-key">{{ t("saver.componentVersion") }}</span>
         <span class="kv-value">
           {{
             status?.state === "installed"
@@ -139,127 +157,148 @@ onMounted(refresh);
                 : "—"
           }}
         </span>
-        <span>{{ t("saver.rollbackPoint") }}</span>
+
+        <span class="kv-key">{{ t("saver.rollbackPoint") }}</span>
         <span class="kv-value">
           {{ status?.rollbackAvailable ? t("saver.rollbackRecorded") : t("saver.rollbackNone") }}
         </span>
       </div>
+
+      <div v-if="status?.rollbackAvailable" class="actions">
+        <button class="secondary" type="button" :disabled="busy" @click="restore">
+          {{ t("saver.restoreOriginal") }}
+        </button>
+      </div>
     </section>
-
-    <aside class="side">
-      <div class="card">
-        <div class="card-title">{{ t("saver.monitorTitle") }}</div>
-        <div class="segmented stretch">
-          <button
-            type="button"
-            :class="{ selected: settings.screensaver.monitorMode === 'primary' }"
-            @click="setMonitorMode('primary')"
-          >
-            {{ t("saver.monitorPrimary") }}
-          </button>
-          <button
-            type="button"
-            :class="{ selected: settings.screensaver.monitorMode === 'all' }"
-            @click="setMonitorMode('all')"
-          >
-            {{ t("saver.monitorAll") }}
-          </button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">{{ t("common.startup") }}</div>
-        <div class="segmented stretch">
-          <button
-            type="button"
-            :class="{ selected: settings.launch.noArgMode === 'settings' }"
-            @click="setNoArgMode('settings')"
-          >
-            {{ t("saver.launchSettings") }}
-          </button>
-          <button
-            type="button"
-            :class="{ selected: settings.launch.noArgMode === 'fullscreen' }"
-            @click="setNoArgMode('fullscreen')"
-          >
-            {{ t("saver.launchFullscreen") }}
-          </button>
-        </div>
-      </div>
-    </aside>
   </div>
 </template>
 
 <style scoped>
 .saver-page {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(262px, 0.82fr);
-  gap: 16px;
-}
-
-.main {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ui-scroll) transparent;
-}
-
-.actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 屏保这一段是整页唯一的主操作，给一个带边框的 hero 把它抬起来。
+   其余段落仍是平铺的——一页里只能有一个「重点」。 */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--ui-divider-strong);
+  border-radius: 4px;
+  background: #fbfaf8;
+}
+
+.hero-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: #292a2d;
+  color: #fff;
+}
+
+.hero-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hero-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hero-copy strong {
+  font-size: 11.5px;
+  font-weight: 620;
+  color: var(--ui-text);
+}
+
+.hero-copy small {
+  font-size: 10px;
+  color: var(--ui-text-muted);
+}
+
+.msg {
+  margin: -6px 0 14px;
+  padding: 8px 10px;
+  font-size: 10.5px;
+  border-radius: var(--radius-card);
+}
+
+.msg.ok {
+  color: var(--ui-success);
+  background: rgba(47, 111, 79, 0.09);
+}
+
+.msg.err {
+  color: var(--ui-danger);
+  background: rgba(168, 67, 58, 0.08);
 }
 
 .kv {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   gap: 7px 12px;
-  font-size: 10px;
+  font-size: 10.5px;
+}
+
+.kv-key {
   color: var(--ui-text-muted);
 }
 
 .kv-value {
   color: var(--ui-text-secondary);
   word-break: break-all;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
 }
 
-.msg {
-  font-size: 10.5px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--ui-divider);
-}
-
-.msg.ok {
-  color: var(--ui-success);
-  border-color: rgba(132, 184, 153, 0.3);
-  background: rgba(132, 184, 153, 0.08);
-}
-
-.msg.err {
-  color: var(--ui-danger);
-  border-color: rgba(217, 119, 119, 0.3);
-  background: rgba(217, 119, 119, 0.08);
-}
-
-.side {
+.actions {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
+  gap: 8px;
 }
 
-/* 最后一张卡撑到底，右侧卡片底边才能和主卡片/侧栏对齐 */
-.side .card:last-child {
-  flex: 1;
+/* 打开系统设置是「跳出去」的动作，给它一条淡下划线；
+   界面里没有蓝色，靠下划线而不是颜色来区分「这是链接」。 */
+.mini {
+  padding: 2px 0;
+  font-size: 10px;
+  color: var(--ui-text-secondary);
+  text-decoration: underline;
+  text-decoration-color: rgba(27, 27, 26, 0.38);
+  text-underline-offset: 3px;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+
+.mini:hover {
+  color: var(--ui-text);
+  text-decoration-color: rgba(27, 27, 26, 0.75);
+}
+
+.segmented.narrow {
+  align-self: flex-start;
+  /* 不设固定宽度：容器按按钮内容收缩，后面才不会多出一截空灰底。
+     早先写死 208/264px 是按"别铺满整行"来的，但 align-self:flex-start
+     本身就已经贴合内容，宽度反而成了多余的灰。 */
+  width: max-content;
 }
 
 .msg-enter-active,
 .msg-leave-active {
-  transition: opacity 0.18s ease;
+  transition: opacity 0.16s ease;
 }
 
 .msg-enter-from,

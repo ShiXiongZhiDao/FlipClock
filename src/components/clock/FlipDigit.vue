@@ -92,11 +92,36 @@ onBeforeUnmount(() => clearTimeout(timer));
   flex: none;
   width: var(--card-w);
   height: var(--card-h);
-  border-radius: var(--radius);
+  border-radius: var(--card-radius, var(--radius));
   perspective: calc(var(--card-h) * 6);
+  /* 主题里的阴影长度用 em 写（0.6em / 1.4em…），em 解析的是**这里的**字号。
+     所以这个字号必须与卡宽成比例，否则阴影是恒定像素：主题卡里 33px 的卡配上
+     18px 的模糊，整块卡糊成一团光，与全屏看到的不是同一个东西。
+     除数 16.9 来自 1080p、默认缩放下的卡宽 220px ÷ 基准字号 13px，
+     即「默认那一档的渲染逐像素不变」，其它尺寸按比例跟随。 */
+  font-size: var(--card-font, inherit);
   background: var(--card-bottom);
-  box-shadow: var(--card-shadow), inset 0 1px rgba(255, 255, 255, 0.07);
+  /* --card-bevel 让镜面主题换上更硬的金属倒角；--card-edge 画一圈细金边
+     （黑标典藏金）。两者都有默认值，老主题的 box-shadow 一字不变。 */
+  box-shadow:
+    var(--card-shadow),
+    inset 0 0.077em var(--card-bevel, rgba(255, 255, 255, 0.07)),
+    inset 0 0 0 1px var(--card-edge, transparent);
   overflow: hidden;
+}
+
+/* 卡内那圈细金线（黑标典藏金）：默认 display:none，只有设了 --card-inset-ring
+   的主题才生成，所以不给其他主题多出一层绘制。 */
+.flip-card::after {
+  content: "";
+  display: var(--card-inset-display, none);
+  position: absolute;
+  z-index: 6;
+  /* 与卡宽成比例：3px 是 220px 卡宽下的取值。 */
+  inset: 0.23em;
+  border: 1px solid var(--card-inset-ring, transparent);
+  border-radius: calc(var(--card-radius, var(--radius)) * 0.6);
+  pointer-events: none;
 }
 
 .half,
@@ -123,7 +148,26 @@ onBeforeUnmount(() => clearTimeout(timer));
   font-size: calc(var(--digit-size) * var(--font-scale, 1));
   line-height: 1;
   color: var(--digit);
-  text-shadow: 0 1px var(--digit-shadow);
+  /* 阴影分两条路：纯色数字用 text-shadow，渐变填充的数字必须用 drop-shadow。
+     text-shadow 从字形内部透出来，会把 background-clip:text 的填充盖成暗色
+     （实测 0.85 的黑影直接把浅金渐变压成 #252019）。drop-shadow 作用在
+     渲染后的图像上，阴影只落在字形外面。默认值保持老主题逐像素不变。 */
+  text-shadow: var(--digit-shadow-layer, 0 1px var(--digit-shadow));
+  filter: var(--digit-filter, none);
+  /* 数字可以是纯色，也可以是一层金属渐变（镜面土豪金那种深咖浮雕）。
+     四个变量默认值都让渐变不生效，所以老主题的渲染逐像素不变。 */
+  background-image: var(--digit-fill, none);
+  -webkit-background-clip: var(--digit-clip, border-box);
+  background-clip: var(--digit-clip, border-box);
+  -webkit-text-fill-color: var(--digit-ink, currentColor);
+  /* 金属倒角的细亮边。宽度默认 0，只有土豪金那两个主题才画；
+     paint-order 让描边落在填充下面，只在外缘露出一点，不会糊住渐变。 */
+  -webkit-text-stroke-width: var(--digit-stroke-width, 0);
+  -webkit-text-stroke-color: var(--digit-stroke-color, transparent);
+  paint-order: var(--digit-paint-order, normal);
+  /* 只有纹理图填充才用元素级透明度（图片无法「带 alpha 的颜色」）；
+     纯色与渐变走颜色自带的 alpha，这里保持 1。 */
+  opacity: var(--digit-opacity, 1);
   letter-spacing: var(--digit-spacing, -0.02em);
   transform: translateY(var(--digit-shift, 0));
   /* 两位一卡时一张卡里是两个字形，绝不能折行——一折行整块钟面就散了。 */
@@ -132,8 +176,10 @@ onBeforeUnmount(() => clearTimeout(timer));
 
 .half.top {
   top: 0;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: linear-gradient(180deg, var(--card-top), var(--card-top-end));
+  border-radius: var(--card-radius, var(--radius)) var(--card-radius, var(--radius)) 0 0;
+  /* --card-top-fill 让主题换成多段对角渐变（镜面反射）；
+     未定义时退回原来的两色垂直渐变，老主题不变。 */
+  background: var(--card-top-fill, linear-gradient(180deg, var(--card-top), var(--card-top-end)));
 }
 
 .half.top span {
@@ -142,8 +188,11 @@ onBeforeUnmount(() => clearTimeout(timer));
 
 .half.bottom {
   bottom: 0;
-  border-radius: 0 0 var(--radius) var(--radius);
-  background: linear-gradient(180deg, var(--card-bottom-start), var(--card-bottom));
+  border-radius: 0 0 var(--card-radius, var(--radius)) var(--card-radius, var(--radius));
+  background: var(
+    --card-bottom-fill,
+    linear-gradient(180deg, var(--card-bottom-start), var(--card-bottom))
+  );
 }
 
 .half.bottom span {
@@ -162,8 +211,9 @@ onBeforeUnmount(() => clearTimeout(timer));
 .flap.top {
   top: 0;
   transform-origin: bottom;
-  background: var(--card-top);
-  border-radius: var(--radius) var(--radius) 0 0;
+  /* 翻转的半片必须和静态半片用同一层填充，否则翻到一半会跳色。 */
+  background: var(--card-top-fill, var(--card-top));
+  border-radius: var(--card-radius, var(--radius)) var(--card-radius, var(--radius)) 0 0;
 }
 
 .flap.top span {
@@ -174,8 +224,8 @@ onBeforeUnmount(() => clearTimeout(timer));
   bottom: 0;
   transform-origin: top;
   transform: rotateX(90deg);
-  background: var(--card-bottom);
-  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--card-bottom-fill, var(--card-bottom));
+  border-radius: 0 0 var(--card-radius, var(--radius)) var(--card-radius, var(--radius));
 }
 
 .flap.bottom span {
