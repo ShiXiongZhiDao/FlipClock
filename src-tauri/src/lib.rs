@@ -1,5 +1,6 @@
 mod autostart;
 mod commands;
+mod config_bundle;
 mod errors;
 mod install;
 mod launch_mode;
@@ -55,7 +56,6 @@ pub fn run() {
     builder
         .setup(move |app| {
             let handle = app.handle().clone();
-
 
             let loaded = settings::load(&handle);
             let no_arg_mode = loaded.launch.no_arg_mode;
@@ -162,6 +162,9 @@ pub fn run() {
             commands::fonts_dir_path,
             commands::import_font,
             commands::remove_font,
+            commands::export_config_bundle,
+            commands::inspect_config_bundle,
+            commands::import_config_bundle,
         ])
         .build(tauri::generate_context!())
         .expect("error while running FlipClock")

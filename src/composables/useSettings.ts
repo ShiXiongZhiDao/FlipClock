@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { reactive, ref, watch } from "vue";
+import { nextTick, reactive, ref, watch } from "vue";
 
 import { trackFeatureToggled, trackUiAppearance } from "../lib/analytics";
 import { applyAppearance } from "../lib/appearance";
@@ -189,8 +189,22 @@ function applyRemoteUi(remote: Settings): void {
   };
 }
 
+function applyRemoteSettings(remote: Settings): void {
+  settings.schemaVersion = remote.schemaVersion ?? 4;
+  applyRemoteAppearance(remote);
+  settings.system = {
+    closeToTray: remote.system?.closeToTray ?? true,
+  };
+  settings.screensaver = remote.screensaver ?? settings.screensaver;
+  settings.launch = remote.launch ?? settings.launch;
+  applyRemoteUi(remote);
+  settings.registration = remote.registration;
+  languageBaseline.value = settings.ui.language;
+  appearanceBaseline.value = settings.ui.appearance;
+}
+
 /**
- * 预览窗口关闭后重新拉一次配置。
+ * 整体重读配置：预览窗口关闭、配置包导入后都走这里。
  *
  * 预览窗口是独立的 WebView，它保存的主题与配置主窗口不会自动知道；
  * Rust 在关窗时发 `theme-preview-closed`，这里接住再读一遍。
@@ -201,12 +215,11 @@ async function reload(): Promise<void> {
     const remote = await invoke<Settings>("get_settings");
     beginHydration();
     try {
-      applyRemoteAppearance(remote);
-      // 语言也可能在全屏配置里改过：这一步会同时更新本窗口文字与托盘。
-      applyRemoteUi(remote);
+      applyRemoteSettings(remote);
     } finally {
       endHydration();
     }
+    await nextTick();
   } catch (error) {
     console.warn("reload settings failed", error);
   }
@@ -250,20 +263,8 @@ async function load() {
       const remote = await invoke<Settings>("get_settings");
       beginHydration();
       try {
-        settings.schemaVersion = remote.schemaVersion ?? 4;
-        applyRemoteAppearance(remote);
-        settings.system = {
-          closeToTray: remote.system?.closeToTray ?? true,
-        };
-        settings.screensaver = remote.screensaver ?? settings.screensaver;
-        settings.launch = remote.launch ?? settings.launch;
-        applyRemoteUi(remote);
-        settings.registration = remote.registration;
+        applyRemoteSettings(remote);
         loaded.value = true;
-        // settings.ui 的赋值已触发 watch，但回调在微任务里才跑。先把基线设成
-        // 刚加载进来的值，回调读到相等就不会把「加载配置」误报成用户切换。
-        languageBaseline.value = settings.ui.language;
-        appearanceBaseline.value = settings.ui.appearance;
       } finally {
         endHydration();
       }
@@ -326,5 +327,5 @@ async function reset(): Promise<string[]> {
 }
 
 export function useSettings() {
-  return { settings, loaded, error, load, flush, reset, toggleSound };
+  return { settings, loaded, error, load, flush, reload, reset, toggleSound };
 }

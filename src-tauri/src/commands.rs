@@ -5,9 +5,9 @@ use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::autostart;
+use crate::errors::AppError;
 use crate::install::{self, ScreenSaverStatus};
 use crate::screensaver::{self, AppState};
-use crate::errors::AppError;
 use crate::settings::{
     self, Appearance, LaunchSettings, ScreenSaverSettings, Settings, SystemSettings, UiSettings,
 };
@@ -56,11 +56,15 @@ pub fn set_locale(app: AppHandle, locale: String) -> Result<(), String> {
             return Err(AppError::SetLocaleFailed {
                 detail: format!("unsupported locale: {locale}"),
             }
-            .into())
+            .into());
         }
     };
-    crate::tray::set_language(&app, language)
-        .map_err(|e| AppError::SetLocaleFailed { detail: e.to_string() }.into())
+    crate::tray::set_language(&app, language).map_err(|e| {
+        AppError::SetLocaleFailed {
+            detail: e.to_string(),
+        }
+        .into()
+    })
 }
 
 #[tauri::command]
@@ -139,7 +143,10 @@ pub fn open_windows_screensaver_settings() -> Result<(), String> {
 /// 否则一次 XSS 就能拿它当任意程序启动器。
 const ABOUT_LINKS: &[(&str, &str)] = &[
     ("website", "https://shixiongzhidao.cn"),
-    ("issues", "https://github.com/ShiXiongZhiDao/FlipClock/issues"),
+    (
+        "issues",
+        "https://github.com/ShiXiongZhiDao/FlipClock/issues",
+    ),
     ("projects", "https://github.com/ShiXiongZhiDao"),
     ("screensaver", "https://github.com/ShiXiongZhiDao/FlipClock"),
 ];
@@ -167,10 +174,12 @@ pub fn open_about_link(key: String) -> Result<(), String> {
         .args(["/c", "start", "", url])
         .spawn()
         .map(|_| ())
-        .map_err(|e| AppError::OpenBrowserFailed {
-            detail: e.to_string(),
-        }
-        .into())
+        .map_err(|e| {
+            AppError::OpenBrowserFailed {
+                detail: e.to_string(),
+            }
+            .into()
+        })
 }
 
 /// 从全屏时钟回到设置窗口。先开设置窗口再关全屏窗口，
@@ -189,8 +198,8 @@ pub async fn leave_fullscreen_clock(app: AppHandle) -> Result<(), String> {
 
 /// 主题图片上限。32MB 是文件大小；解码后的内存通常是它的三到四倍，
 /// 屏保在多显示器上还会同时加载，所以另有单边像素上限。
-const THEME_IMAGE_MAX_BYTES: u64 = 32 * 1024 * 1024;
-const THEME_IMAGE_MAX_SIDE: u32 = 8192;
+pub(crate) const THEME_IMAGE_MAX_BYTES: u64 = 32 * 1024 * 1024;
+pub(crate) const THEME_IMAGE_MAX_SIDE: u32 = 8192;
 
 /// 主题 id 会被拼进文件路径，必须只允许小写字母、数字与连字符：
 /// 这条同时挡住 `..`、斜杠与盘符。判据在 settings 里，配置校验与图片导入共用一份。
@@ -283,14 +292,14 @@ pub fn import_theme_image(
             return Err(AppError::ThemeImageTooManyPixels {
                 limit_side: THEME_IMAGE_MAX_SIDE,
             }
-            .into())
+            .into());
         }
         Ok(_) => {}
         Err(error) => {
             return Err(AppError::ThemeImageUnsupported {
                 detail: error.to_string(),
             }
-            .into())
+            .into());
         }
     }
 
@@ -350,7 +359,7 @@ pub fn delete_theme_dir(app: AppHandle, theme_id: String) -> Result<(), String> 
 /* ------------------------------- 导入字体（ADR-0026） ------------------------------ */
 
 const FONT_FILE_MAX_MB: u32 = 32;
-const FONT_FILE_MAX_BYTES: u64 = FONT_FILE_MAX_MB as u64 * 1024 * 1024;
+pub(crate) const FONT_FILE_MAX_BYTES: u64 = FONT_FILE_MAX_MB as u64 * 1024 * 1024;
 
 #[tauri::command]
 pub fn fonts_dir_path(app: AppHandle) -> Result<String, String> {
@@ -359,7 +368,7 @@ pub fn fonts_dir_path(app: AppHandle) -> Result<String, String> {
 }
 
 /// 只认文件头，不认扩展名：改名后的 .exe 不会因为后缀是 .ttf 就混进来。
-fn font_format(bytes: &[u8]) -> Option<&'static str> {
+pub(crate) fn font_format(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x00, 0x01, 0x00, 0x00]) || bytes.starts_with(b"true") {
         Some("ttf")
     } else if bytes.starts_with(b"OTTO") {
@@ -374,7 +383,7 @@ fn font_format(bytes: &[u8]) -> Option<&'static str> {
 }
 
 /// 只用于导入去重，不是安全哈希；固定实现，跨版本稳定即可。
-fn fnv1a_hex(bytes: &[u8]) -> String {
+pub(crate) fn fnv1a_hex(bytes: &[u8]) -> String {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in bytes {
         hash ^= u64::from(*byte);
@@ -475,6 +484,64 @@ pub fn remove_font(app: AppHandle, font_id: String, filename: String) -> Result<
     Ok(())
 }
 
+/// 导出全量配置包（ADR-0027）。前端先 flush，保存对话框给出目标路径。
+#[tauri::command]
+pub fn export_config_bundle(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
+    let settings = state
+        .settings
+        .lock()
+        .map(|value| value.clone())
+        .map_err(|_| String::from(AppError::ConfigUnavailable))?;
+    crate::config_bundle::export_bundle(&app, &settings, std::path::Path::new(&path))
+}
+
+/// 只读配置包，返回选择摘要；不写盘、不改配置。
+#[tauri::command]
+pub fn inspect_config_bundle(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<crate::config_bundle::BundleSummary, String> {
+    let settings = state
+        .settings
+        .lock()
+        .map(|value| value.clone())
+        .map_err(|_| String::from(AppError::ConfigUnavailable))?;
+    crate::config_bundle::inspect_bundle(&app, &settings, std::path::Path::new(&path))
+}
+
+/// 归档：先备份当前配置，再合并选中的内容、保存并更新内存状态。
+#[tauri::command]
+pub fn import_config_bundle(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+    selection: crate::config_bundle::BundleSelection,
+) -> Result<crate::config_bundle::ImportResult, String> {
+    let current = state
+        .settings
+        .lock()
+        .map(|value| value.clone())
+        .map_err(|_| String::from(AppError::ConfigUnavailable))?;
+    let (next, result) = crate::config_bundle::import_bundle(
+        &app,
+        &current,
+        std::path::Path::new(&path),
+        &selection,
+    )?;
+    settings::save(&app, &next)?;
+    let mut guard = state
+        .settings
+        .lock()
+        .map_err(|_| String::from(AppError::ConfigUnavailable))?;
+    *guard = next;
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,12 +586,18 @@ mod tests {
         assert_eq!(patch.appearance.fonts[0].file, "custom-a.ttf");
         assert!(profile.show_colon);
         assert!(!patch.system.close_to_tray);
-        assert_eq!(patch.ui.language, crate::settings::LanguagePreference::System);
+        assert_eq!(
+            patch.ui.language,
+            crate::settings::LanguagePreference::System
+        );
     }
 
     #[test]
     fn font_format_uses_magic_bytes_not_the_extension() {
-        assert_eq!(font_format(&[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Some("ttf"));
+        assert_eq!(
+            font_format(&[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            Some("ttf")
+        );
         assert_eq!(font_format(b"OTTO............"), Some("otf"));
         assert_eq!(font_format(b"wOFF............"), Some("woff"));
         assert_eq!(font_format(b"wOF2............"), Some("woff2"));
@@ -544,10 +617,16 @@ mod tests {
             super::about_link_url("website").unwrap(),
             "https://shixiongzhidao.cn"
         );
-        assert!(super::about_link_url("projects")
-            .unwrap()
-            .contains("ShiXiongZhiDao"));
-        assert!(super::about_link_url("issues").unwrap().ends_with("/issues"));
+        assert!(
+            super::about_link_url("projects")
+                .unwrap()
+                .contains("ShiXiongZhiDao")
+        );
+        assert!(
+            super::about_link_url("issues")
+                .unwrap()
+                .ends_with("/issues")
+        );
         // 前端传来的任意 URL 不能越过白名单。
         assert!(super::about_link_url("https://evil.example").is_err());
         assert!(super::about_link_url("").is_err());

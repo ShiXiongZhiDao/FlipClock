@@ -2,12 +2,20 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
+import ConfigBundleDialog from "../../components/settings/ConfigBundleDialog.vue";
 import { useSettings } from "../../composables/useSettings";
 import { isTauri } from "../../lib/env";
-import { errorText, t, type MessageKey } from "../../lib/i18n";
+import { errorText, locale, t, type MessageKey } from "../../lib/i18n";
 import { useUpdater } from "../../lib/updater";
+import type {
+  ConfigBundleSelection,
+  ConfigBundleSummary,
+  ConfigImportResult,
+  ConfigImportSkip,
+} from "../../types/configBundle";
 import type { NoArgMode, UiAppearance } from "../../types/settings";
 
 /**
@@ -65,7 +73,8 @@ function wireQrImages() {
   }
 }
 
-const { settings, reset } = useSettings();
+const { settings, reset, flush, reload } = useSettings();
+const tauri = isTauri();
 
 /** 三个语言选项。跟随系统的实际语言由 i18n 在启动时算，不在 UI 上展开地区变体。 */
 const LANGUAGE_OPTIONS: { value: "system" | "zh" | "en"; label: MessageKey }[] = [
@@ -130,6 +139,108 @@ async function toggleAutostart() {
 
 function setNoArgMode(mode: NoArgMode) {
   settings.launch.noArgMode = mode;
+}
+
+/* -------------------------------- 配置迁移（ADR-0027） -------------------------------- */
+
+const importSummary = ref<ConfigBundleSummary | null>(null);
+const importPath = ref<string | null>(null);
+const importBusy = ref(false);
+const exportBusy = ref(false);
+
+function bundleFileName(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `FlipClock-config-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.zip`;
+}
+
+async function exportConfig(): Promise<void> {
+  if (!tauri || exportBusy.value) return;
+  exportBusy.value = true;
+  try {
+    const path = await save({
+      defaultPath: bundleFileName(),
+      filters: [{ name: t("system.configExportFilter"), extensions: ["zip"] }],
+    });
+    if (!path) return;
+    await flush();
+    await invoke("export_config_bundle", { path });
+    notify("ok", t("system.configExportSuccess"));
+  } catch (error) {
+    notify("err", errorText(error));
+  } finally {
+    exportBusy.value = false;
+  }
+}
+
+async function startImport(): Promise<void> {
+  if (!tauri || importBusy.value) return;
+  importBusy.value = true;
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: t("system.configExportFilter"), extensions: ["zip"] }],
+    });
+    const path = Array.isArray(selected) ? selected[0] : selected;
+    if (!path) return;
+    await flush();
+    const summary = await invoke<ConfigBundleSummary>("inspect_config_bundle", { path });
+    importPath.value = path;
+    importSummary.value = summary;
+  } catch (error) {
+    notify("err", errorText(error));
+  } finally {
+    importBusy.value = false;
+  }
+}
+
+function cancelImport(): void {
+  if (importBusy.value) return;
+  importSummary.value = null;
+  importPath.value = null;
+}
+
+const SKIP_REASON_KEYS: Record<ConfigImportSkip["reason"], MessageKey> = {
+  themeLimit: "system.configSkipThemeLimit",
+  fontLimit: "system.configSkipFontLimit",
+  fontMissing: "system.configSkipFontMissing",
+};
+
+function skipReasonLabel(skip: ConfigImportSkip): string {
+  return t(SKIP_REASON_KEYS[skip.reason], { name: skip.name });
+}
+
+async function confirmImport(selection: ConfigBundleSelection): Promise<void> {
+  const path = importPath.value;
+  if (!path) return;
+  importBusy.value = true;
+  try {
+    const result = await invoke<ConfigImportResult>("import_config_bundle", {
+      path,
+      selection,
+    });
+    importSummary.value = null;
+    importPath.value = null;
+    await reload();
+    const skipped = result.skipped
+      .map(skipReasonLabel)
+      .join(locale.value === "zh" ? "、" : ", ");
+    const summary = t("system.configImportResult", {
+      themes: result.themes,
+      fonts: result.fonts,
+      skipped: result.skipped.length,
+    });
+    notify(
+      "ok",
+      result.skipped.length
+        ? `${summary} ${t("system.configImportSkipped", { items: skipped })}`
+        : summary,
+    );
+  } catch (error) {
+    notify("err", errorText(error));
+  } finally {
+    importBusy.value = false;
+  }
 }
 
 /**
@@ -328,6 +439,32 @@ onBeforeUnmount(() => {
       <p class="row-hint">{{ t("uiAppearance.hint") }}</p>
     </section>
 
+    <section v-if="tauri" class="section">
+      <div class="section-head">
+        <span class="section-title">{{ t("system.configMigration") }}</span>
+      </div>
+      <div class="lines">
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.configExport") }}</span>
+            <span class="row-hint">{{ t("system.configExportHint") }}</span>
+          </div>
+          <button type="button" class="secondary" :disabled="exportBusy" @click="exportConfig">
+            {{ t("system.configExportAction") }}
+          </button>
+        </div>
+        <div class="row">
+          <div class="row-copy">
+            <span class="row-name">{{ t("system.configImport") }}</span>
+            <span class="row-hint">{{ t("system.configImportHint") }}</span>
+          </div>
+          <button type="button" class="secondary" :disabled="importBusy" @click="startImport">
+            {{ t("system.configImportAction") }}
+          </button>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
       <div class="section-head">
         <span class="section-title">{{ t("system.restoreSection") }}</span>
@@ -460,6 +597,14 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Transition>
+
+    <ConfigBundleDialog
+      v-if="importSummary"
+      :summary="importSummary"
+      :busy="importBusy"
+      @cancel="cancelImport"
+      @confirm="confirmImport"
+    />
   </div>
 </template>
 

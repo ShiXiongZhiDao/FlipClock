@@ -1157,6 +1157,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "windows",
+ "zip",
 ]
 
 [[package]]

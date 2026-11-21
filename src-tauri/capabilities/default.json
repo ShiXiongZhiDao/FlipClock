@@ -15,6 +15,7 @@
     "updater:default",
     "process:default",
     "aptabase:allow-track-event",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }
