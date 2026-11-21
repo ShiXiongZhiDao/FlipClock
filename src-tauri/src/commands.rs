@@ -170,16 +170,20 @@ pub fn open_about_link(key: String) -> Result<(), String> {
     // WebView 里的 target="_blank" 不会打开系统浏览器，必须走系统 shell。
     let url = about_link_url(&key)?;
 
-    std::process::Command::new("cmd")
-        .args(["/c", "start", "", url])
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| {
-            AppError::OpenBrowserFailed {
-                detail: e.to_string(),
-            }
-            .into()
-        })
+    let mut command = std::process::Command::new("cmd");
+    command.args(["/c", "start", "", url]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // cmd.exe 是控制台程序；GUI 父进程不隐藏它，打开链接时就会闪一下黑窗。
+        command.creation_flags(0x0800_0000);
+    }
+    command.spawn().map(|_| ()).map_err(|e| {
+        AppError::OpenBrowserFailed {
+            detail: e.to_string(),
+        }
+        .into()
+    })
 }
 
 /// 从全屏时钟回到设置窗口。先开设置窗口再关全屏窗口，

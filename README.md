@@ -10,19 +10,20 @@
   <img src="https://img.shields.io/badge/release-v1.0.1-green" alt="v1.0.1">
 </p>
 
-<p align="center"><img src="./assets/screenshots/clock-per-pair.jpg" alt="FlipClock full-screen clock, two digits per card" width="880"></p>
+<p align="center"><img src="./assets/screenshots/clock-classic-dark.jpg" alt="FlipClock full-screen clock, classic dark theme, two digits per card" width="880"></p>
 
 ## What it does
 
 FlipClock turns a Windows desktop into a mechanical split-flap clock, with the flip animation and its click generated at runtime — no audio files to ship.
 
 - **Themes** — five built-in themes; six parts such as background, card, and digits with selectable materials and colours, plus custom images. Each theme carries its own clock profile, so switching themes switches the whole clock face.
-- **Clock face** — one or two digits per card, 24/12-hour time, optional date, seconds, and separator dots; adjustable scale, brightness, and digit font.
+- **Clock face** — one or two digits per card, 24/12-hour time, optional date, seconds, and separator dots; adjustable scale, brightness, and digit font. Import local fonts (ttf / otf / woff / woff2) for the digits; files are copied into the configuration directory.
 - **Editing** — double-click the clock to open full-screen setup: change settings in a drawer while watching the result. Save writes once; Discard rolls everything back.
 - **Window** — two-column Settings with a live preview and five tabs. Interface language and UI appearance (system / light / dark) are selectable; appearance changes only the shell, never the clock face.
+- **Config bundle** — export themes, fonts, and preferences from **System**, then choose what to restore on import. Custom themes and fonts are merged, never deleted.
 - **Running** — system tray, autostart, primary or all monitors. The same binary is also a registerable `.scr` screen saver, installed per user without administrator rights.
 
-<p align="center"><img src="./assets/screenshots/clock-per-digit-colon.jpg" alt="One-digit-per-card layout with separator dots" width="880"></p>
+<p align="center"><img src="./assets/screenshots/clock-black-label-seconds.jpg" alt="Black Label Gold theme with seconds and date" width="880"></p>
 
 ## What it is not
 
@@ -50,7 +51,7 @@ A split-flap clock is nice to look at, but most desktop versions are either a br
 
 ## Screenshots
 
-The two full-screen images above show the two digit layouts. The interface language can follow the system or be set to Chinese or English; the four images below show the Chinese UI. The top row is the Settings window in light and dark; the bottom row is the full-screen setup drawer in light and dark. UI appearance never touches the clock face — that is decided by the theme.
+The two full-screen images above show the classic dark theme with two digits per card, and the Black Label Gold theme with seconds and date. The interface language can follow the system or be set to Chinese or English; the five images below show the Chinese UI. The top row is the Settings window in light and dark, the middle row is the **Time** tab of the full-screen setup drawer in light and dark, and the last one is a custom theme combining a background image with a digit texture. UI appearance never touches the clock face — that is decided by the theme.
 
 | Settings · light UI | Settings · dark UI |
 | --- | --- |
@@ -59,6 +60,8 @@ The two full-screen images above show the two digit layouts. The interface langu
 | Full-screen setup · light drawer | Full-screen setup · dark drawer |
 | --- | --- |
 | <img src="./assets/screenshots/zh/fullscreen-setup-light.jpg" alt="Light full-screen setup drawer" width="700"> | <img src="./assets/screenshots/zh/fullscreen-setup-dark.jpg" alt="Dark full-screen setup drawer" width="700"> |
+
+<p align="center"><img src="./assets/screenshots/clock-custom-texture.jpg" alt="Custom theme with background image and digit texture" width="880"></p>
 
 ## Privacy and boundaries
 
@@ -118,6 +121,12 @@ UI appearance changes only the light/dark look of the Settings window and the fu
 
 **Will a custom theme break if I move its images?**
 No. Images are copied into the configuration directory when you pick them, so moving or deleting the originals does not affect the theme.
+
+**What happens if I delete an imported font file?**
+Nothing — the font is copied into the configuration directory. But if you remove the font inside the app, themes using it fall back to Bebas Neue.
+
+**How do I take my themes and fonts to another machine?**
+Export a config bundle from **System**, then import it on the other machine and select what to restore. Custom themes and fonts are merged rather than overwriting what is already there; built-in clock profiles and the preferences you select do overwrite their counterparts.
 
 ## Build from source
 

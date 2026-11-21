@@ -5,7 +5,6 @@ import { t } from "../../lib/i18n";
 import {
   ensureFontLoaded,
   fontMetrics,
-  fontSampleStyle,
   fontState,
 } from "../../lib/fonts";
 import {
@@ -14,6 +13,7 @@ import {
   isBuiltinFontId,
 } from "../../lib/fontRegistry";
 import type { CustomFont } from "../../types/settings";
+import FontSample from "./FontSample.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -119,11 +119,7 @@ watch(() => props.modelValue, scrollActive);
             :class="{ active: modelValue === font }"
             @click="choose(font)"
           >
-            <span class="font-sample" :style="fontSampleStyle(font)" aria-hidden="true">
-              <span>08</span>
-              <i class="sample-dots"><b></b><b></b></i>
-              <span>38</span>
-            </span>
+            <FontSample :font-id="font" />
             <small class="font-name">{{ t(FONT_LABELS[font]) }}</small>
             <span v-if="modelValue === font" class="font-check" aria-hidden="true">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
@@ -151,11 +147,7 @@ watch(() => props.modelValue, scrollActive);
             :class="{ active: modelValue === font.id }"
             @click="choose(font.id)"
           >
-            <span class="font-sample" :style="fontSampleStyle(font.id)" aria-hidden="true">
-              <span>08</span>
-              <i class="sample-dots"><b></b><b></b></i>
-              <span>38</span>
-            </span>
+            <FontSample :font-id="font.id" />
             <small class="font-name" :title="font.name">{{ font.name }}</small>
             <small v-if="warning(font)" class="font-status">{{ warning(font) }}</small>
             <span v-if="modelValue === font.id" class="font-check" aria-hidden="true">
@@ -270,38 +262,7 @@ watch(() => props.modelValue, scrollActive);
   border-color: var(--ui-accent);
   box-shadow: inset 0 0 0 1px var(--ui-accent);
   color: var(--ui-text);
-}
-
-.font-sample {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.16em;
-  max-width: 100%;
-  font-family: var(--font-clock, var(--font-ui));
-  font-weight: var(--digit-weight, 400);
-  letter-spacing: var(--digit-spacing, -0.02em);
-  font-size: 20px;
-  line-height: 1.15;
-  color: var(--ui-text-secondary);
-}
-
-.sample-dots {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.16em;
-  margin: 0 0.04em;
-}
-
-.sample-dots b {
-  display: block;
-  width: 0.14em;
-  height: 0.14em;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.font-choice.active .font-sample {
-  color: var(--ui-text);
+  --font-sample-color: var(--ui-text);
 }
 
 .font-name {

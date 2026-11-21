@@ -55,6 +55,9 @@
   /* 只有这三个颜色带语义，其余一律是灰 */
   --ui-success: #2f6f4f;
   --ui-danger: #a8433a;
+  /* 危险色实心按钮的两端：浅色档白字压深红，深色档墨字压浅珊瑚 */
+  --ui-danger-ink: #ffffff;
+  --ui-danger-hover: #923930;
   --ui-warn: #946a24;
 
   --ui-track: #efede9;
@@ -192,6 +195,8 @@
 
   --ui-success: #66b58c;
   --ui-danger: #e08074;
+  --ui-danger-ink: #1b1a18;
+  --ui-danger-hover: #ee9a90;
   --ui-warn: #d8a94f;
 
   /* 轨道与选中块必须拉开一档：浅色是白块压浅轨，10 级灰差就够；

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 
 import FlipClock from "../../components/clock/FlipClock.vue";
+import AppDialog from "../../components/settings/AppDialog.vue";
 import FontPicker from "../../components/theme/FontPicker.vue";
+import FontSample from "../../components/theme/FontSample.vue";
 import { useClock } from "../../composables/useClock";
 import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
@@ -12,8 +14,13 @@ import { useStudioLauncher } from "../../composables/useStudioLauncher";
 import { useToast } from "../../composables/useToast";
 import { useTheme } from "../../composables/useTheme";
 import { isTauri } from "../../lib/env";
-import { ensureFontLoaded, forgetFont, setFontLibrary, uniqueFontName } from "../../lib/fonts";
-import { errorText, locale, t } from "../../lib/i18n";
+import {
+  ensureFontLoaded,
+  forgetFont,
+  setFontLibrary,
+  uniqueFontName,
+} from "../../lib/fonts";
+import { errorText, t } from "../../lib/i18n";
 import { rangeFill } from "../../lib/rangeFill";
 import { forgetThemeAssets, themeAssetUrl } from "../../lib/theme/assets";
 import { blankTheme, cloneTheme, isBuiltinThemeId } from "../../lib/theme/presets";
@@ -26,6 +33,7 @@ import {
   BRIGHTNESS_MIN,
   CUSTOM_FONT_LIMIT,
   CUSTOM_THEME_LIMIT,
+  FONT_NAME_MAX,
   type CustomFont,
   type ThemeSpec,
 } from "../../types/settings";
@@ -78,6 +86,109 @@ function uniqueName(base: string): string {
     base,
     settings.appearance.customThemes.map((theme) => theme.name),
   );
+}
+
+/* --------------------------------- 弹窗 -------------------------------- */
+
+const FALLBACK_THEME_ID = "classic-dark";
+
+type FontDeleteTarget = { font: CustomFont; themes: ThemeSpec[] };
+
+const fontRenameTarget = ref<CustomFont | null>(null);
+const fontRenameDraft = ref("");
+const fontRenameInput = ref<HTMLInputElement | null>(null);
+const fontDeleteTarget = ref<FontDeleteTarget | null>(null);
+const themeDeleteTarget = ref<ThemeSpec | null>(null);
+
+const renameEmpty = computed(() => fontRenameDraft.value.trim().length === 0);
+const renameFinalName = computed(() =>
+  uniqueFontName(
+    fontRenameDraft.value,
+    settings.appearance.fonts
+      .filter((font) => font.id !== fontRenameTarget.value?.id)
+      .map((font) => font.name),
+    t("appearance.fontDefaultName"),
+  ),
+);
+const renameDuplicate = computed(
+  () =>
+    !renameEmpty.value &&
+    renameFinalName.value !== fontRenameDraft.value.trim(),
+);
+const renameNote = computed(() => {
+  if (renameEmpty.value) return t("appearance.fontRenameEmpty");
+  if (renameDuplicate.value) {
+    return t("appearance.fontRenameDuplicate", { name: renameFinalName.value });
+  }
+  return t("appearance.fontRenameHint");
+});
+const fontDeleteUsed = computed(() => (fontDeleteTarget.value?.themes.length ?? 0) > 0);
+const fallbackTheme = computed(
+  () =>
+    allThemes.value.find((theme) => theme.id === FALLBACK_THEME_ID) ??
+    currentTheme.value,
+);
+const fallbackThemeLabel = computed(() => themeLabel(fallbackTheme.value));
+
+function renameFont(font: CustomFont): void {
+  fontRenameTarget.value = font;
+  fontRenameDraft.value = font.name;
+  void ensureFontLoaded(font);
+  void nextTick(() => {
+    fontRenameInput.value?.focus({ preventScroll: true });
+    fontRenameInput.value?.select();
+  });
+}
+
+function submitRename(): void {
+  const font = fontRenameTarget.value;
+  if (!font || renameEmpty.value) return;
+  font.name = renameFinalName.value;
+  fontRenameTarget.value = null;
+}
+
+function removeFont(font: CustomFont): void {
+  const themes = themeIdsUsingFont(settings, font.id)
+    .map((themeId) => allThemes.value.find((theme) => theme.id === themeId))
+    .filter((theme): theme is ThemeSpec => !!theme);
+  fontDeleteTarget.value = { font, themes };
+}
+
+async function submitRemoveFont(): Promise<void> {
+  const target = fontDeleteTarget.value;
+  if (!target) return;
+  fontDeleteTarget.value = null;
+
+  for (const item of Object.values(settings.appearance.profiles)) {
+    if (item.font === target.font.id) item.font = "bebas";
+  }
+  settings.appearance.fonts = settings.appearance.fonts.filter(
+    (item) => item.id !== target.font.id,
+  );
+  forgetFont(target.font.id);
+  await removeFontFile(target.font);
+  notify(t("appearance.fontRemoved", { name: target.font.name }));
+}
+
+function removeTheme(theme: ThemeSpec): void {
+  themeDeleteTarget.value = theme;
+}
+
+async function submitRemoveTheme(): Promise<void> {
+  const theme = themeDeleteTarget.value;
+  if (!theme) return;
+  themeDeleteTarget.value = null;
+
+  const index = settings.appearance.customThemes.findIndex((item) => item.id === theme.id);
+  if (index >= 0) settings.appearance.customThemes.splice(index, 1);
+  // 配置与主题成对存在：删主题必须连带删它的钟面配置（ADR-0022）。
+  delete settings.appearance.profiles[theme.id];
+  if (settings.appearance.theme === theme.id) {
+    settings.appearance.theme = FALLBACK_THEME_ID;
+    notify(t("appearance.deletedInUse"));
+  }
+  forgetThemeAssets(theme.id);
+  await invoke("delete_theme_dir", { themeId: theme.id }).catch(() => {});
 }
 
 /* --------------------------------- 字体库 -------------------------------- */
@@ -166,50 +277,6 @@ async function importFonts(): Promise<void> {
   }
 }
 
-function renameFont(font: CustomFont): void {
-  const next = window.prompt(t("appearance.fontRenamePrompt"), font.name);
-  if (next === null) return;
-  const trimmed = next.trim();
-  if (!trimmed) {
-    notify(t("appearance.fontRenameEmpty"));
-    return;
-  }
-  font.name = uniqueFontName(
-    trimmed,
-    settings.appearance.fonts
-      .filter((item) => item.id !== font.id)
-      .map((item) => item.name),
-    t("appearance.fontDefaultName"),
-  );
-}
-
-async function removeFont(font: CustomFont): Promise<void> {
-  const affectedIds = themeIdsUsingFont(settings, font.id);
-  const affected = affectedIds
-    .map((themeId) => allThemes.value.find((theme) => theme.id === themeId))
-    .filter((theme): theme is ThemeSpec => !!theme)
-    .map((theme) => themeLabel(theme));
-  const separator = locale.value === "zh" ? "、" : ", ";
-  const message = affected.length
-    ? t("appearance.fontDeleteConfirm", {
-        name: font.name,
-        count: affected.length,
-        themes: affected.join(separator),
-      })
-    : t("appearance.fontDeleteConfirmUnused", { name: font.name });
-  if (!window.confirm(message)) return;
-
-  for (const item of Object.values(settings.appearance.profiles)) {
-    if (item.font === font.id) item.font = "bebas";
-  }
-  settings.appearance.fonts = settings.appearance.fonts.filter(
-    (item) => item.id !== font.id,
-  );
-  forgetFont(font.id);
-  await removeFontFile(font);
-  notify(t("appearance.fontRemoved", { name: font.name }));
-}
-
 function openFailure(error: unknown): void {
   notify(t("appearance.fullscreenFailed"));
   console.warn("open fullscreen setup failed", error);
@@ -255,19 +322,6 @@ function startEdit(theme: ThemeSpec): void {
   void launch("theme", { editingThemeId: theme.id }).catch(openFailure);
 }
 
-async function removeTheme(theme: ThemeSpec): Promise<void> {
-  if (!window.confirm(t("appearance.deleteConfirm", { name: themeLabel(theme) }))) return;
-  const index = settings.appearance.customThemes.findIndex((item) => item.id === theme.id);
-  if (index >= 0) settings.appearance.customThemes.splice(index, 1);
-  // 配置与主题成对存在：删主题必须连带删它的钟面配置（ADR-0022）。
-  delete settings.appearance.profiles[theme.id];
-  if (settings.appearance.theme === theme.id) {
-    settings.appearance.theme = "classic-dark";
-    notify(t("appearance.deletedInUse"));
-  }
-  forgetThemeAssets(theme.id);
-  await invoke("delete_theme_dir", { themeId: theme.id }).catch(() => {});
-}
 </script>
 
 <template>
@@ -445,6 +499,92 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
         </div>
       </div>
     </section>
+
+    <AppDialog
+      v-if="fontRenameTarget"
+      :title="t('appearance.fontRenameTitle')"
+      :confirm-label="t('appearance.save')"
+      :cancel-label="t('appearance.cancel')"
+      :confirm-disabled="renameEmpty"
+      submit-on-enter
+      @cancel="fontRenameTarget = null"
+      @confirm="submitRename"
+    >
+      <div class="dlg-label-row">
+        <span>{{ t("appearance.fontRenameLabel") }}</span>
+        <em>{{ t("appearance.fontRenameMax", { max: FONT_NAME_MAX }) }}</em>
+      </div>
+      <input
+        ref="fontRenameInput"
+        v-model="fontRenameDraft"
+        class="dlg-input"
+        :class="{ invalid: renameEmpty }"
+        :maxlength="FONT_NAME_MAX"
+        :aria-label="t('appearance.fontRenameLabel')"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <p class="dlg-note" :class="{ error: renameEmpty, preview: renameDuplicate }">
+        {{ renameNote }}
+      </p>
+      <div class="dlg-specimen">
+        <span class="dlg-specimen-label">{{ t("appearance.fontSpecimen") }}</span>
+        <FontSample class="dlg-specimen-digits" :font-id="fontRenameTarget.id" />
+      </div>
+    </AppDialog>
+
+    <AppDialog
+      v-if="fontDeleteTarget"
+      :title="t('appearance.fontDeleteTitle')"
+      :confirm-label="t('appearance.fontDeleteAction')"
+      :cancel-label="t('appearance.cancel')"
+      tone="danger"
+      @cancel="fontDeleteTarget = null"
+      @confirm="submitRemoveFont"
+    >
+      <p class="dlg-body">
+        <template v-if="fontDeleteUsed">
+          {{ t("appearance.fontDeleteUsed", {
+            name: fontDeleteTarget.font.name,
+            count: fontDeleteTarget.themes.length,
+          }) }}
+        </template>
+        <template v-else>
+          {{ t("appearance.fontDeleteUnused", { name: fontDeleteTarget.font.name }) }}
+        </template>
+      </p>
+      <div v-if="fontDeleteUsed" class="dlg-chips">
+        <span
+          v-for="theme in fontDeleteTarget.themes"
+          :key="theme.id"
+          class="dlg-chip"
+        >
+          <i :style="swatchStyle(theme)" aria-hidden="true"></i>{{ themeLabel(theme) }}
+        </span>
+      </div>
+      <p class="dlg-hint">
+        {{ fontDeleteUsed
+          ? t("appearance.fontDeleteHint")
+          : t("appearance.fontDeleteHintUnused") }}
+      </p>
+    </AppDialog>
+
+    <AppDialog
+      v-if="themeDeleteTarget"
+      :title="t('appearance.deleteThemeTitle')"
+      :confirm-label="t('appearance.deleteThemeAction')"
+      :cancel-label="t('appearance.cancel')"
+      tone="danger"
+      @cancel="themeDeleteTarget = null"
+      @confirm="submitRemoveTheme"
+    >
+      <p class="dlg-body">
+        {{ t("appearance.deleteThemeBody", { name: themeLabel(themeDeleteTarget) }) }}
+      </p>
+      <p class="dlg-hint">
+        {{ t("appearance.deleteThemeHint", { fallback: fallbackThemeLabel }) }}
+      </p>
+    </AppDialog>
   </div>
 </template>
 
@@ -713,5 +853,131 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
     grid-template-columns: minmax(0, 1fr);
     gap: 15px;
   }
+}
+
+/* 应用内弹窗（ADR-0028）共用的小部件 */
+.dlg-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 11px 0 5px;
+  font-size: 10px;
+  color: var(--ui-text-label);
+}
+
+.dlg-label-row em {
+  font-style: normal;
+  font-size: 8.5px;
+  color: var(--ui-text-faint);
+}
+
+.dlg-input {
+  display: block;
+  width: 100%;
+  height: 33px;
+  padding: 0 9px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--radius-card);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 12px/1.4 var(--font-ui);
+  outline: none;
+  caret-color: var(--ui-accent);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dlg-input:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px var(--ui-focus);
+}
+
+.dlg-input.invalid {
+  border-color: var(--ui-danger);
+  box-shadow: 0 0 0 3px var(--ui-danger-soft);
+}
+
+.dlg-note {
+  margin: 5px 0 0;
+  min-height: 15px;
+  font-size: 9.5px;
+  line-height: 1.55;
+  color: var(--ui-text-muted);
+}
+
+.dlg-note.error {
+  color: var(--ui-danger);
+}
+
+.dlg-note.preview {
+  color: var(--ui-text-secondary);
+}
+
+.dlg-body {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ui-text-secondary);
+}
+
+.dlg-hint {
+  margin: 6px 0 0;
+  font-size: 9.5px;
+  line-height: 1.55;
+  color: var(--ui-text-muted);
+}
+
+.dlg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.dlg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--ui-divider-strong);
+  border-radius: var(--radius-card);
+  background: var(--ui-surface);
+  font-size: 9.5px;
+  color: var(--ui-text-secondary);
+}
+
+.dlg-chip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.dlg-specimen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 44px;
+  margin-top: 9px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-divider);
+  border-radius: var(--radius-card);
+  background: var(--ui-surface-2);
+}
+
+.dlg-specimen-label {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+.dlg-specimen-digits {
+  --font-sample-size: 24px;
+  --font-sample-line: 1;
+  --font-sample-color: var(--ui-text);
+  --digit-spacing: 0.03em;
+  min-width: 0;
 }
 </style>
