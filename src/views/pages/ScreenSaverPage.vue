@@ -1,38 +1,53 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
+import { useScreensaverStatus } from "../../composables/useScreensaverStatus";
 import { useSettings } from "../../composables/useSettings";
-import { trackFeatureToggled } from "../../lib/analytics";
-import { isTauri } from "../../lib/env";
-import { errorText, t, type MessageKey } from "../../lib/i18n";
-import type {
-  MonitorMode,
-  RegistrationState,
-  ScreenSaverStatus,
-} from "../../types/settings";
+import { errorText, t } from "../../lib/i18n";
+import { SAVER_STATE_UI, saverUiState, saverWindowsOff } from "../../lib/saverStatus";
+import type { MonitorMode } from "../../types/settings";
 
 const { settings } = useSettings();
+const {
+  status,
+  statusError,
+  busy,
+  refresh,
+  install: installComponent,
+  restore: restoreComponent,
+  openWindowsSettings,
+} = useScreensaverStatus();
 
-const status = ref<ScreenSaverStatus | null>(null);
-const busy = ref(false);
 const message = ref<{ tone: "ok" | "err"; text: string } | null>(null);
 let messageTimer: ReturnType<typeof setTimeout> | undefined;
 
-const STATUS_TEXT: Record<RegistrationState, { key: MessageKey; tone: string }> = {
-  notInstalled: { key: "saver.status.notInstalled", tone: "idle" },
-  installed: { key: "saver.status.installed", tone: "ok" },
-  missing: { key: "saver.status.missing", tone: "err" },
-  outdated: { key: "saver.status.outdated", tone: "warn" },
-};
+const uiState = computed(() => saverUiState(status.value));
 
-const statusInfo = computed(() =>
-  status.value
-    ? { label: t(STATUS_TEXT[status.value.state].key), tone: STATUS_TEXT[status.value.state].tone }
-    : null,
-);
+const statusInfo = computed(() => {
+  const state = uiState.value;
+  if (!state) return null;
+  const meta = SAVER_STATE_UI[state];
+  return { label: t(meta.pageLabel), tone: meta.tone };
+});
 
-const deployed = computed(() => status.value?.state === "installed");
+const primaryLabel = computed(() => {
+  const state = uiState.value;
+  if (!state) return null;
+  const key = SAVER_STATE_UI[state].pageAction;
+  return key ? t(key) : null;
+});
+
+/**
+ * 只读状态行：启用/关闭交给 Windows 屏保设置，避免在应用里再造一个写注册表的开关。
+ * 未安装时显示「—」，不要让人以为 FlipClock 已经在待命。
+ */
+const windowsState = computed(() => {
+  const value = status.value;
+  if (!value || value.state === "notInstalled") return "—";
+  return value.windowsEnabled ? t("saver.windowsOn") : t("saver.windowsOff");
+});
+
+const showEnable = computed(() => saverWindowsOff(status.value));
 
 function notify(tone: "ok" | "err", text: string) {
   message.value = { tone, text };
@@ -40,44 +55,27 @@ function notify(tone: "ok" | "err", text: string) {
   messageTimer = setTimeout(() => (message.value = null), 4200);
 }
 
-async function refresh() {
-  if (!isTauri()) return;
-  try {
-    status.value = await invoke<ScreenSaverStatus>("screensaver_status");
-  } catch (e) {
-    notify("err", errorText(e));
-  }
-}
-
 async function install() {
-  busy.value = true;
   try {
-    status.value = await invoke<ScreenSaverStatus>("install_screensaver");
-    trackFeatureToggled("screensaver", true);
+    await installComponent();
     notify("ok", t("saver.installToast"));
   } catch (e) {
     notify("err", errorText(e));
-  } finally {
-    busy.value = false;
   }
 }
 
 async function restore() {
-  busy.value = true;
   try {
-    status.value = await invoke<ScreenSaverStatus>("restore_screensaver");
-    trackFeatureToggled("screensaver", false);
+    await restoreComponent();
     notify("ok", t("saver.restoreToast"));
   } catch (e) {
     notify("err", errorText(e));
-  } finally {
-    busy.value = false;
   }
 }
 
 async function openSystemSettings() {
   try {
-    await invoke("open_windows_screensaver_settings");
+    await openWindowsSettings();
   } catch (e) {
     notify("err", errorText(e));
   }
@@ -88,6 +86,8 @@ function setMonitorMode(mode: MonitorMode) {
 }
 
 onMounted(refresh);
+
+onBeforeUnmount(() => clearTimeout(messageTimer));
 </script>
 
 <template>
@@ -104,10 +104,25 @@ onMounted(refresh);
         <small>{{ t("saver.productDesc") }}</small>
       </span>
       <span v-if="statusInfo" class="badge" :class="statusInfo.tone">{{ statusInfo.label }}</span>
-      <button class="primary" type="button" :disabled="busy" @click="install">
-        {{ t(deployed ? "saver.redeploy" : "saver.installShort") }}
+      <button
+        v-if="primaryLabel"
+        class="primary"
+        type="button"
+        :disabled="busy"
+        @click="install"
+      >
+        {{ primaryLabel }}
       </button>
     </section>
+
+    <p class="install-note">{{ t("saver.installNote") }}</p>
+
+    <p v-if="statusError" class="msg err" :title="statusError">
+      {{ t("saver.statusReadError") }}
+      <button type="button" class="mini" @click="refresh">
+        {{ t("saver.retry") }}
+      </button>
+    </p>
 
     <Transition name="msg">
       <p v-if="message" class="msg" :class="message.tone">{{ message.text }}</p>
@@ -147,6 +162,17 @@ onMounted(refresh);
         <span class="kv-key">{{ t("saver.currentTarget") }}</span>
         <span class="kv-value">{{ status?.activePath || t("saver.notSet") }}</span>
 
+        <span class="kv-key">{{ t("saver.windowsState") }}</span>
+        <span class="kv-value">
+          {{ windowsState }}
+          <template v-if="showEnable">
+            ·
+            <button type="button" class="mini" @click="openSystemSettings">
+              {{ t("saver.enableWindows") }}
+            </button>
+          </template>
+        </span>
+
         <span class="kv-key">{{ t("saver.componentVersion") }}</span>
         <span class="kv-value">
           {{
@@ -164,8 +190,26 @@ onMounted(refresh);
         </span>
       </div>
 
-      <div v-if="status?.rollbackAvailable" class="actions">
-        <button class="secondary" type="button" :disabled="busy" @click="restore">
+      <div
+        v-if="status?.state === 'installed' || status?.rollbackAvailable"
+        class="actions"
+      >
+        <button
+          v-if="status?.state === 'installed'"
+          class="secondary"
+          type="button"
+          :disabled="busy"
+          @click="install"
+        >
+          {{ t("saver.redeploy") }}
+        </button>
+        <button
+          v-if="status?.rollbackAvailable"
+          class="secondary"
+          type="button"
+          :disabled="busy"
+          @click="restore"
+        >
           {{ t("saver.restoreOriginal") }}
         </button>
       </div>
@@ -232,6 +276,13 @@ onMounted(refresh);
 
 .hero-copy small {
   font-size: 10px;
+  color: var(--ui-text-muted);
+}
+
+.install-note {
+  margin: -4px 2px 14px;
+  font-size: 9.5px;
+  line-height: 1.5;
   color: var(--ui-text-muted);
 }
 

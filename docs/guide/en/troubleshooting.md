@@ -16,13 +16,13 @@ the code, it is phrased as something to check rather than a fact.
 
 ## The screen saver does not appear
 
-- **Not installed** — Settings → Saver → **Install and Set as Current Screen Saver**.
+- **Not installed** — Settings → Saver → **Install Screen Saver**.
 - **It vanished from the Windows list** — the list shows `System32\*.scr` plus the current
   selection. Choosing another saver removes FlipClock; install it again to bring it back.
 - **Windows Preview is blank** — `/p` system preview is not supported by design. Use
   **Preview Screen Saver** in the app.
-- **Version Mismatch** — close any running saver, then click
-  **Redeploy Screen Saver Component**.
+- **Outdated / Update Needed** — close any running saver, then click
+  **Update Screen Saver**.
 - **The wait time is ignored** — it is a Windows setting, not a FlipClock setting. Open it
   from the Saver page.
 

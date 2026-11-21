@@ -9,7 +9,7 @@ screen saver fires. Registration is per user.
 ## Install
 
 1. Open **Settings → Saver**.
-2. Click **Install and Set as Current Screen Saver**.
+2. Click **Install Screen Saver**.
 3. Set the wait time in Windows: **Saver → Open Windows Screen Saver Settings**.
 
 What the install does:
@@ -26,8 +26,8 @@ replace the Windows lock screen.
 
 The Windows screen saver list shows the files in `System32\*.scr` **plus the currently
 selected saver**. FlipClock gets into that list as the current value, not because it lives
-in `System32`. Pick another saver and FlipClock drops out — click **Install and Set as
-Current Screen Saver** again to bring it back.
+in `System32`. Pick another saver and FlipClock drops out — click **Install Screen Saver**
+again to bring it back.
 
 Making it a permanent list entry would mean writing to `System32`, which needs
 administrator rights; the project deliberately does not do that.
@@ -46,14 +46,14 @@ administrator rights; the project deliberately does not do that.
 subset of monitors is not supported. If a monitor is added, removed, or its resolution
 changes, the running session rebuilds itself.
 
-## Restore, reinstall, version mismatch
+## Restore, reinstall, update needed
 
 - **Restore Original Screen Saver** returns the selection recorded before install.
 - Uninstalling FlipClock restores it automatically.
 - At startup the app compares the registered `.scr` with itself and refreshes the copy when
   they differ. If the copy cannot be replaced (the saver is running, or the file is locked),
-  the Saver page shows **Version Mismatch**. Close the saver, then click
-  **Redeploy Screen Saver Component**.
+  the preview-column status strip says the saver is outdated and the Saver page shows
+  **Update Needed**. Close the saver, then click **Update Screen Saver**.
 
 ## Command line
 

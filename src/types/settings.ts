@@ -224,6 +224,8 @@ export interface ScreenSaverStatus {
   targetPath: string;
   activePath: string | null;
   rollbackAvailable: boolean;
+  /** Windows 侧屏保开关；组件已安装但这里为 false 时只需去系统里启用。 */
+  windowsEnabled: boolean;
 }
 
 export const THEME_LABELS: Record<BuiltinThemeId, import("../lib/i18n").MessageKey> = {

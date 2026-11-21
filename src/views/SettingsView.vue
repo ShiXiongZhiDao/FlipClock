@@ -5,12 +5,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import FlipClock from "../components/clock/FlipClock.vue";
+import SaverStatusStrip from "../components/settings/SaverStatusStrip.vue";
 import AppearancePage from "./pages/AppearancePage.vue";
 import ScreenSaverPage from "./pages/ScreenSaverPage.vue";
 import SoundPage from "./pages/SoundPage.vue";
 import SystemPage from "./pages/SystemPage.vue";
 import TimePage from "./pages/TimePage.vue";
 import { useClock } from "../composables/useClock";
+import { useScreensaverStatus } from "../composables/useScreensaverStatus";
 import { useSettings } from "../composables/useSettings";
 import { useStudioLauncher } from "../composables/useStudioLauncher";
 import { useTheme } from "../composables/useTheme";
@@ -25,6 +27,19 @@ const { settings, loaded, error, flush, load } = useSettings();
 const { launch } = useStudioLauncher();
 const { now } = useClock();
 const { current: currentTheme, profile, backgroundUrl, digitUrl } = useTheme();
+const {
+  status: saverStatus,
+  statusError: saverStatusError,
+  busy: saverBusy,
+  justInstalled: saverJustInstalled,
+  dismissInstalledHint,
+  refresh: refreshSaver,
+  install: installSaver,
+  openWindowsSettings: openSaverSettings,
+} = useScreensaverStatus();
+const saverPending = ref(false);
+let saverRetry: ReturnType<typeof setTimeout> | undefined;
+let saverSettleAttempts = 0;
 
 /** 版本号只在页脚出现；启动时取一次就够。 */
 const versionText = ref("");
@@ -88,11 +103,13 @@ const appWindow = isTauri() ? getCurrentWindow() : null;
 let unlistenClose: (() => void) | undefined;
 
 function minimize() {
+  dismissInstalledHint();
   void appWindow?.minimize();
 }
 
 /** 真正的保存与关闭在 onCloseRequested 里做，按钮只负责发起关闭。 */
 function closeWindow() {
+  dismissInstalledHint();
   void appWindow?.close();
 }
 
@@ -102,6 +119,50 @@ const { toast, notify } = useToast(2800);
 watch(error, (value) => {
   if (value) notify(t("settings.saveFailed", { error: errorText(value) }));
 });
+
+async function installSaverFromStrip() {
+  try {
+    await installSaver();
+  } catch (e) {
+    notify(errorText(e));
+  }
+}
+
+async function openSaverSettingsFromStrip() {
+  try {
+    await openSaverSettings();
+  } catch (e) {
+    notify(errorText(e));
+  }
+}
+
+function gotoSaverPage() {
+  page.value = "screensaver";
+}
+
+/**
+ * 启动时后台自动刷新可能还没把 .scr 换完；先不显示「需要更新」，
+ * 最多等两次后仍是旧版才让它出现，避免升级后闪一下错误的动作。
+ */
+async function refreshSaverUntilSettled() {
+  await refreshSaver();
+  if (saverStatus.value?.state !== "outdated") {
+    saverPending.value = false;
+    saverSettleAttempts = 0;
+    return;
+  }
+  if (saverSettleAttempts >= 2) {
+    saverPending.value = false;
+    saverSettleAttempts = 0;
+    return;
+  }
+  saverPending.value = true;
+  saverSettleAttempts += 1;
+  saverRetry = setTimeout(
+    () => void refreshSaverUntilSettled(),
+    saverSettleAttempts === 1 ? 600 : 900,
+  );
+}
 
 async function preview() {
   try {
@@ -123,6 +184,9 @@ async function openFullscreenSetup() {
 onMounted(async () => {
   await load();
 
+  // 启动时的 .scr 自动刷新在后台线程里，等它落定再决定要不要显示「需要更新」。
+  void refreshSaverUntilSettled();
+
   // 统计在配置就绪后发：快照要带用户当前的配置。去重由 analytics.ts 管
   // （localStorage + 时间窗），因为多个 WebView 各有自己的模块状态。
   trackAppStarted(settings);
@@ -140,6 +204,7 @@ onMounted(async () => {
     const win = appWindow;
     unlistenClose = await win.onCloseRequested((event) => {
       event.preventDefault();
+      dismissInstalledHint();
       void (async () => {
         // 配置没读出来就没什么可存的；失败的是读取，不该把窗口锁死。
         if (loaded.value) {
@@ -159,7 +224,24 @@ onMounted(async () => {
   await invoke("ui_ready").catch(() => {});
 });
 
+/** 从 Windows 屏保设置切回来时，开关可能已经变了，重新读一次。 */
+function refreshSaverOnFocus() {
+  void refreshSaver();
+}
+
+function dismissHintWhenHidden() {
+  if (document.hidden) dismissInstalledHint();
+}
+
+onMounted(() => {
+  window.addEventListener("focus", refreshSaverOnFocus);
+  document.addEventListener("visibilitychange", dismissHintWhenHidden);
+});
+
 onBeforeUnmount(() => {
+  clearTimeout(saverRetry);
+  window.removeEventListener("focus", refreshSaverOnFocus);
+  document.removeEventListener("visibilitychange", dismissHintWhenHidden);
   unlistenClose?.();
 });
 </script>
@@ -206,6 +288,18 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
+
+        <SaverStatusStrip
+          v-if="page !== 'screensaver' && !saverPending"
+          :status="saverStatus"
+          :error="Boolean(saverStatusError)"
+          :busy="saverBusy"
+          :just-installed="saverJustInstalled"
+          @install="installSaverFromStrip"
+          @retry="refreshSaver"
+          @details="gotoSaverPage"
+          @open-settings="openSaverSettingsFromStrip"
+        />
 
         <section class="quick-card">
           <div class="quick-head">{{ t("preview.quickSettings") }}</div>
@@ -259,7 +353,6 @@ onBeforeUnmount(() => {
       <main class="settings-panel">
         <header class="settings-top">
           <div class="drag-layer" data-tauri-drag-region></div>
-          <span class="settings-label">{{ t("settings.title") }}</span>
           <div class="top-actions">
             <button
               class="icon-action"
@@ -299,6 +392,7 @@ onBeforeUnmount(() => {
             type="button"
             class="tab"
             :class="{ active: page === item.id }"
+            :aria-current="page === item.id ? 'page' : undefined"
             @click="page = item.id"
           >
             {{ t(item.label) }}
@@ -598,26 +692,18 @@ onBeforeUnmount(() => {
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* 标题栏左侧的 product name 已去掉，只剩右侧窗口控件：
+     必须显式靠右，否则 space-between 在单子元素时会把它推到最左边。 */
+  justify-content: flex-end;
   height: 26px;
   margin-bottom: 12px;
 }
 
-.settings-label {
-  position: relative;
-  z-index: 1;
-  font-size: 13px;
-  font-weight: 620;
-  color: var(--ui-text);
-  pointer-events: none;
-}
-
 /* 动作按钮与交通灯同层：必须盖在拖拽层上才收得到点击。
-   左侧品牌块留在 --pad-x（22px）与内容列对齐，右侧这几个贴边（15px）——
-   不对称是刻意的：左边是产品名，右边是窗口控件。
-   右边距取负值把它贴到窗口边缘（26 - 12 = 14px）：这几个是窗口控件，
-   该像窗口控件那样贴边，而不是跟下面的内容列对齐——否则右侧会空出一大块，
-   和 12px 的上边距摆在一起显得整条栏偏左。 */
+   右侧这几个贴边（15px）：它们是窗口控件，该像窗口控件那样贴边，
+   而不是跟下面的内容列对齐。
+   右边距取负值把它贴到窗口边缘（26 - 12 = 14px）：
+   写成 calc 是为了跟着 --pad-x 走，改内边距时不会重新分叉。 */
 .top-actions {
   position: relative;
   z-index: 1;
@@ -709,28 +795,32 @@ onBeforeUnmount(() => {
   --light: var(--ui-traffic-min);
 }
 
-/* 横向页签：只有文字 + 一条墨色细线，没有图标也没有底色块。
-   图标排成一行是「仪表盘」的做法；五个词足够说清这是哪五页。 */
+/* 横向页签：整条浅底分段控件，选中块是白底 + 一道浅描边。
+   与页内的 .segmented 同一套语汇——代价是两处挨着时层级会弱一点，
+   但导航本身比文字下划线更像「可以切换的五个区」。 */
 .tabs {
   flex: none;
   display: flex;
-  align-items: stretch;
-  gap: 22px;
+  gap: 2px;
+  padding: 3px;
   margin-bottom: 15px;
-  border-bottom: 1px solid var(--ui-divider);
+  border-radius: 6px;
+  background: var(--ui-surface-2);
 }
 
 .tab {
-  position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
-  height: 34px;
-  padding: 0 1px 7px;
-  font-size: 11.5px;
+  justify-content: center;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 11px;
   letter-spacing: 0.01em;
   color: var(--ui-text-muted);
   white-space: nowrap;
-  transition: color 0.12s ease;
+  border-radius: 4px;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .tab:hover {
@@ -738,18 +828,16 @@ onBeforeUnmount(() => {
 }
 
 .tab.active {
+  background: var(--ui-thumb);
   color: var(--ui-text);
-  font-weight: 620;
+  font-weight: 600;
+  box-shadow: var(--ui-thumb-shadow);
 }
 
-.tab.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1.5px;
-  background: var(--ui-accent);
+/* 深色档里 --ui-thumb 只比轨道亮一档，单靠底色分不出选中项；
+   补一圈 1px 墨边，和主题卡/布局卡的选中语汇保持一致。 */
+:root[data-appearance="dark"] .tab.active {
+  box-shadow: var(--ui-thumb-shadow), inset 0 0 0 1px var(--ui-line-hover);
 }
 
 .page-scroll {

@@ -29,6 +29,9 @@ pub struct ScreenSaverStatus {
     pub target_path: String,
     pub active_path: Option<String>,
     pub rollback_available: bool,
+    /// Windows 屏保开关（`ScreenSaveActive`）。注册指向我们、但系统侧被关掉时，
+    /// 安装状态仍是已安装，需要单独提示用户去启用。
+    pub windows_enabled: bool,
 }
 
 pub fn target_path() -> Result<PathBuf, String> {
@@ -160,10 +163,16 @@ fn files_equal(a: &PathBuf, b: &PathBuf) -> bool {
     }
 }
 
+/// 缺失按 Windows 默认视为开启；只有显式 "0" 才是关闭。
+fn screen_save_enabled(value: Option<&str>) -> bool {
+    value.map(|v| v.trim() != "0").unwrap_or(true)
+}
+
 pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
     let target = target_path()?;
     let target_text = target.to_string_lossy().to_string();
     let active = platform::read_desktop_string(SCRNSAVE_EXE).filter(|v| !v.is_empty());
+    let screen_save_active = platform::read_desktop_string(SCREEN_SAVE_ACTIVE);
     let rollback_available = app
         .state::<AppState>()
         .settings
@@ -194,6 +203,7 @@ pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
         target_path: target_text,
         active_path: active,
         rollback_available,
+        windows_enabled: screen_save_enabled(screen_save_active.as_deref()),
     })
 }
 
@@ -303,4 +313,17 @@ pub fn open_windows_settings() -> Result<(), String> {
             detail: e.to_string(),
         }
         .into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::screen_save_enabled;
+
+    #[test]
+    fn screen_save_active_defaults_to_enabled() {
+        assert!(screen_save_enabled(None));
+        assert!(screen_save_enabled(Some("1")));
+        assert!(!screen_save_enabled(Some("0")));
+        assert!(!screen_save_enabled(Some(" 0 ")));
+    }
 }

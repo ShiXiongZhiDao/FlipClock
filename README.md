@@ -71,8 +71,8 @@ screenshots show Chinese. UI appearance never touches the clock face — the the
 1. **Install** — run the setup (or unzip the portable build) and open FlipClock.
 2. **Make it yours** — in Settings, pick a theme under **Appearance**, then set time format,
    date, seconds, and digit layout under **Time & Date**. Changes save as you go.
-3. **Use it as a screen saver** — **Settings → Saver → Install and Set as Current Screen
-   Saver**, then set the wait time in Windows.
+3. **Use it as a screen saver** — **Settings → Saver → Install Screen Saver**, then set
+   the wait time in Windows.
 
 Closing the Settings window hides it to the tray by default; right-click the tray icon →
 **Quit** to exit.
@@ -122,9 +122,9 @@ No. The screen saver and the autostart entry are both registered under the curre
 No. Closing hides the Settings window to the tray by default. Right-click the icon → *Quit*
 to exit, or turn this off in System → Startup & Window.
 
-**Why does the Saver page say "Version Mismatch"?**
+**Why does the Saver page say "Update Needed"?**
 The registered `.scr` is older than the app you are running. Close any running saver, then
-click *Redeploy Screen Saver Component*.
+click *Update Screen Saver*.
 
 **How do I move my themes and fonts to another machine?**
 Export a config bundle from **System**, then import it on the other machine and select what
