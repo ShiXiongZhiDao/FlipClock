@@ -4,7 +4,9 @@
    段落不是卡片：没有底色、没有圆角、没有投影，只用一条下划线收尾。
    一屏里堆四五张白卡会让人以为每张都要单独保存。
 
-   圆角只有 4px，描边只有 1px，选中态只有「墨色描边」一种表达——
+   控件与内屏 4px，弹窗 6px，大样卡/面板 8px，壳体 13px；
+   全屏配置抽屉内既有控件仍沿用 6/7px，未纳入这套分档。
+   描边只有 1px，选中态只有「墨色描边」一种表达——
    整个界面不需要第二种「选中」语汇。 */
 
 .section {
@@ -329,6 +331,13 @@
   container-type: size;
 }
 
+/* 预览舞台与新建卡位都是「一块小屏」：与主屏同比例（启动时读主屏写入
+   --screen-aspect，兜底 16:9），两侧可见范围才和全屏一致。 */
+.stage,
+.new-stage {
+  aspect-ratio: var(--screen-aspect, 16 / 9);
+}
+
 /* 主题样卡：一整块该主题的颜色 + 缩略钟面 + 名字。
    设置页的主题墙与全屏配置的主题墙共用这一份——两边各画一套的结果是，
    改完一边另一边不跟，用户看到的「卡片长得不一样」永远修不完。
@@ -343,7 +352,7 @@
   text-align: left;
   /* 边框保留但透明：选中态只改颜色，增删 1px 不会让整格跳动。 */
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-panel);
   transition: box-shadow 0.12s ease;
 }
 
@@ -352,9 +361,19 @@
 .theme-sample-stage {
   display: block;
   width: 100%;
-  aspect-ratio: 2.3;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-card);
+}
+
+/* 新建主题的钟面位：设置页与全屏配置抽屉共用这一份，尺寸才和样卡对得上。
+   与整块料同色——主题卡那格有色差是因为主题自己有背景色，新建卡没有主题，
+   再垫一层白底就成了「块里套块」。 */
+.new-stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  border-radius: var(--radius-card);
+  background: transparent;
 }
 
 .theme-sample-name {

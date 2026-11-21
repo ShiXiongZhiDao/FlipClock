@@ -7,6 +7,9 @@ import "./styles/fonts.css";
 import "./styles/global.css";
 import "./styles/ui.css";
 
+import { watchStageAspect } from "./lib/stageAspect";
+import { readBoot } from "./types/boot";
+
 /**
  * 全软件禁用原生右键菜单。
  *
@@ -17,5 +20,11 @@ import "./styles/ui.css";
  * 取舍见 docs/adr/0024：输入框里的右键复制/粘贴一并没了，Ctrl+C/V 不受影响。
  */
 document.addEventListener("contextmenu", (event) => event.preventDefault(), true);
+
+// 只有带主题样卡/左栏预览的窗口需要舞台比例；屏保与全屏时钟不挂监听。
+const bootMode = readBoot().mode;
+if (bootMode === "settings" || bootMode === "theme-preview") {
+  watchStageAspect();
+}
 
 createApp(App).mount("#app");

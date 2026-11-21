@@ -26,17 +26,13 @@ const props = defineProps<{
   font: string;
   /** 钟面整体亮度（只压暗），1 = 原样。 */
   brightness: number;
-  /** stage = 全屏屏保，panel = 嵌在卡片里(按容器宽度缩放)，thumb = 系统预览的缩略画布 */
+  /** stage = 全屏屏保，panel = 嵌在卡片里(按容器短边缩放)，thumb = 系统预览的缩略画布 */
   variant: "stage" | "panel" | "thumb";
-  /** 用户设定的时钟缩放比例，只作用于 stage；另两种形态按容器自适应。 */
-  scale?: number;
   /**
-   * 面板形态下额外乘的系数 = 真实的占屏比例（clockScale / CLOCK_FIT_SCALE）。
-   * 1 表示「刚好铺满这块预览卡」，>1 就会像真屏一样被裁。
-   * 设置页左栏与两处主题墙都传，（全屏配置的）主题卡也不例外——
-   * 同一个主题在卡片、左栏、屏保上必须是同一个大小。
+   * 用户设定的时钟缩放比例。stage 按视口短边（vmin）换算，
+   * panel 按容器短边（cqmin）换算——卡片就是一块小屏，两边同一套几何。
    */
-  previewScale?: number;
+  scale?: number;
   /** 翻页音效；为 null 或 enabled=false 时不发声。 */
   sound?: { enabled: boolean; volume: number } | null;
 }>();
@@ -62,7 +58,6 @@ const meridiem = computed(() => {
 });
 
 const scaleValue = computed(() => props.scale ?? 1);
-const previewScale = computed(() => props.previewScale ?? 1);
 
 /**
  * 冒号透明度调到 0 时整块不渲染。
@@ -166,7 +161,6 @@ const dateText = computed(() => {
       {
         '--flip-half': `${halfDuration}ms`,
         '--user-scale': scaleValue,
-        '--preview-scale': previewScale,
         '--brightness': brightness,
       },
     ]"
@@ -247,6 +241,29 @@ const dateText = computed(() => {
   position: fixed;
   inset: 0;
   --unit: calc(1vmin * var(--user-scale, 1) * var(--row-fit, 1));
+}
+
+/* 嵌在卡片里：**把这块预览卡当成一块屏幕**。
+   单位与 stage 完全同源：stage 的 1vmin ↔ 面板的 1cqmin（容器短边的 1%），
+   再乘同一个用户缩放与 --row-fit。于是卡片上的占屏比例就是真屏的占屏比例，
+   该裁的时候（311% 这种超出）也一起裁。 */
+.clock--panel {
+  width: 100%;
+  height: 100%;
+  --unit: calc(1cqmin * var(--user-scale, 1) * var(--row-fit, 1));
+  /* 阴影字号：预览卡里按卡宽换算，否则 18px 的模糊落在 33px 的卡上会糊成一团光。
+     除数 = 参考档的卡宽 ÷ 13px：1080p、默认 225%、一位一卡时卡宽 401px → 30.8。
+     全屏那一侧的阴影仍是恒定像素（见 .clock 的 --card-font），所以只有在参考档上
+     两者的"阴影/卡宽"比值相同；把缩放拉大或换更高分辨率的屏幕时，预览的阴影会
+     比真机偏轻——这是为了让预览可读而接受的近似，几何（裁切）依旧精确。 */
+  --card-font: calc(var(--card-w) / 30.8);
+  border-radius: var(--radius-card);
+}
+
+/* stage 与 panel 共用同一组几何：只有单位不同（vmin / cqmin），倍数必须一致，
+   改任何一行都是两边一起改。 */
+.clock--stage,
+.clock--panel {
   --clock-gap: calc(3.6 * var(--unit));
   --card-w: calc(16.5 * var(--unit));
   --card-h: calc(23.2 * var(--unit));
@@ -261,7 +278,8 @@ const dateText = computed(() => {
 /* 两位一卡：两张 1:1 方卡。卡宽按「行宽对齐」构造：
    2×33 + 2×3.2 组距 + 1.1 分隔点 = 73.5，与一位一卡的 73.65 几乎相等，
    所以两套排布共用同一个 CLOCK_FIT_SCALE，不必再维护第二个魔数。 */
-.clock--stage.clock--pair {
+.clock--stage.clock--pair,
+.clock--panel.clock--pair {
   --card-w: calc(33 * var(--unit));
   --card-h: var(--card-w);
   --digit-size: calc(34.5 * var(--unit));
@@ -272,64 +290,10 @@ const dateText = computed(() => {
   --clock-gap: calc(3.2 * var(--unit));
 }
 
-/* 嵌在卡片里：**把这块预览卡当成一块屏幕**。
-   先按行宽把卡宽定成「刚好铺满卡片」，再乘 --preview-scale（= 真实占屏比例，
-   见 useClockScale）。于是预览与全屏的占屏比例是同一个数，超限时预览也会裁，
-   不再出现「预览里装得下、屏保里切掉两侧」。
-
-   cqw 那一路按行宽把卡宽定成刚好铺满，cqh 是安全网（极扁或极高的容器里不至于溢出），
-   正常情况下宽度先命中。
-
-   下面的子尺寸是 stage 的卡宽倍数（括号里是 stage 原值 ÷ 卡宽），改一边必须改另一边。 */
-.clock--panel {
-  width: 100%;
-  height: 100%;
-  --row-cards: 4.464; /* 73.65 / 16.5：一行有多少个卡宽（含间距、圆点） */
-  --col-cards: 1.784; /* 卡高 + 钟面行距 + 日期行 */
-  /* 100cqw：预览卡就是一块屏，不留额外余量。留余量会让预览在 240%~260% 这段
-     「看着刚好」而真屏已经出界——用户就是按这个差值来报「预览正常、屏保被裁」的。 */
-  --card-w: calc(
-    min(100cqw / var(--row-cards), 100cqh / var(--col-cards)) * var(--preview-scale, 1)
-  );
-  /* 阴影字号：预览卡里按卡宽换算，否则 18px 的模糊落在 33px 的卡上会糊成一团光。
-     除数 = 参考档的卡宽 ÷ 13px：1080p、默认 225%、一位一卡时卡宽 401px → 30.8。
-     全屏那一侧的阴影仍是恒定像素（见 .clock 的 --card-font），所以只有在参考档上
-     两者的"阴影/卡宽"比值相同；把缩放拉大或换更高分辨率的屏幕时，预览的阴影会
-     比真机偏轻——这是为了让预览可读而接受的近似，几何（裁切）依旧精确。 */
-  --card-font: calc(var(--card-w) / 30.8);
-  --card-h: calc(var(--card-w) * 1.40606); /* 23.2 / 16.5 */
-  --digit-size: calc(var(--card-w) * 1.13939); /* 18.8 / 16.5 */
-  --card-gap: calc(var(--card-w) * 0.0697); /* 1.15 / 16.5 */
-  --group-gap: calc(var(--card-w) * 0.13939); /* 2.3 / 16.5 */
-  --sep-dot: calc(var(--card-w) * 0.04545); /* 0.75 / 16.5 */
-  --date-size: calc(var(--card-w) * 0.13333); /* 2.2 / 16.5 */
-  --radius: calc(var(--card-w) * 0.07879); /* 1.3 / 16.5 */
-  --clock-gap: calc(var(--card-w) * 0.21818); /* 3.6 / 16.5 */
-  border-radius: var(--radius-card);
-}
-
-.clock--panel.clock--seconds {
-  --row-cards: 6.857; /* 113.15 / 16.5 */
-}
-
-/* 两位一卡同样按 stage 折算（33 是方卡的卡宽）。 */
 .clock--panel.clock--pair {
-  --row-cards: 2.227; /* 73.5 / 33 */
-  --col-cards: 1.257; /* 卡高 + 行距 + 日期行，方卡更矮 */
   /* 方卡宽是竖卡的两倍，同一个模糊要维持同样的相对重量，除数也要翻倍：
      1080p / 默认 225% 下方卡 802px ÷ 13px = 61.7。 */
   --card-font: calc(var(--card-w) / 61.7);
-  --card-h: var(--card-w);
-  --digit-size: calc(var(--card-w) * 1.04545); /* 34.5 / 33 */
-  --group-gap: calc(var(--card-w) * 0.09697); /* 3.2 / 33 */
-  --sep-dot: calc(var(--card-w) * 0.03333); /* 1.1 / 33 */
-  --date-size: calc(var(--card-w) * 0.07879); /* 2.6 / 33 */
-  --radius: calc(var(--card-w) * 0.08); /* 2.64 / 33 */
-  --clock-gap: calc(var(--card-w) * 0.09697); /* 3.2 / 33 */
-}
-
-.clock--panel.clock--pair.clock--seconds {
-  --row-cards: 3.454; /* 114 / 33 */
 }
 
 .clock--thumb {

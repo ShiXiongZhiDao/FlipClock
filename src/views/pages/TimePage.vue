@@ -169,7 +169,7 @@ function setLayout(layout: DigitLayout) {
   gap: 2px;
   padding: 10px 11px 9px;
   border: 1px solid var(--ui-divider);
-  border-radius: 4px;
+  border-radius: var(--radius-panel);
   background: var(--ui-surface);
   text-align: left;
   color: var(--ui-text-secondary);

@@ -121,7 +121,7 @@ export interface CustomFont {
 /** 内置 id 与导入 id 都是字符串；只有内置 id 会命中注册表。 */
 export type FontId = string;
 
-/** 时钟缩放比例：只作用于全屏时钟与屏保；左栏预览按阻尼系数演示，见 useClockScale。 */
+/** 时钟缩放比例：全屏时钟、屏保与设置页预览共用同一几何（见 FlipClock 的 --unit）。 */
 export const CLOCK_SCALE_MIN = 0.5;
 export const CLOCK_SCALE_MAX = 4.5;
 export const CLOCK_SCALE_STEP = 0.05;
@@ -129,8 +129,8 @@ export const CLOCK_SCALE_STEP = 0.05;
 /**
  * 16:9 屏幕上「时钟刚好占满屏幕宽度」的缩放值。
  *
- * 设置窗口左栏与主题卡都用它换算占屏比例（`clockScale / CLOCK_FIT_SCALE`），
- * 同时也标在缩放滑杆上当参照点：「铺满 16:9 约 241%」。
+ * 只用来标在缩放滑杆上当参照点：「铺满 16:9 约 241%」。
+ * 预览不再换算占屏比例——stage 与 panel 直接共用 clockScale，见 FlipClock 的 --unit。
  *
  * 推导（一位一卡，不带秒）：一行 = 4×16.5 + **2**×1.15 + 2×2.3 + 0.75 = 73.65u
  *（每组两张卡，卡缝只有两个），u = 1vmin × scale；16:9 屏宽 = 177.78vmin。

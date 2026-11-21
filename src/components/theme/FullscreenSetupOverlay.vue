@@ -7,7 +7,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import FlipClock from "../clock/FlipClock.vue";
 import FontPicker from "./FontPicker.vue";
 import { useClock } from "../../composables/useClock";
-import { previewScaleOf } from "../../composables/useClockScale";
 import { useToast } from "../../composables/useToast";
 import { playFlipSound } from "../../lib/flipSound";
 import { setFontLibrary } from "../../lib/fonts";
@@ -566,7 +565,7 @@ onBeforeUnmount(() => {
                         :show-colon="cardProfile(theme).showColon"
                         :font="cardProfile(theme).font"
                         :brightness="cardProfile(theme).brightness"
-                        :preview-scale="previewScaleOf(cardProfile(theme).clockScale)"
+                        :scale="cardProfile(theme).clockScale"
                         variant="panel"
                       />
                     </span>
@@ -1571,7 +1570,7 @@ onBeforeUnmount(() => {
 }
 
 /* 新建卡：与设置页**逐条一致**（那边是 .new-theme），只有对齐方式沿用抽屉的居中。
-   整块浅色料 + 2.3 的钟面位（透明）+ 加号 + 名字，不套边框。 */
+   整块浅色料 + 主屏比例的钟面位（透明）+ 加号 + 名字，不套边框。 */
 .theme-new {
   display: flex;
   flex-direction: column;
@@ -1579,7 +1578,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-panel);
   /* 与设置页同一个 token：第二层灰在白底与抽屉的渐变底上都几乎看不见。 */
   background: var(--ui-surface-3);
   color: var(--ui-text-muted);
@@ -1590,15 +1589,6 @@ onBeforeUnmount(() => {
   color: var(--ui-text-secondary);
 }
 
-.new-stage {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 2.3;
-  border-radius: 2px;
-  /* 与整块料同色：主题卡那格有色差是因为主题自己有背景色，新建卡没有主题。 */
-  background: transparent;
-}
 
 .theme-new .plus {
   font-size: 20px;

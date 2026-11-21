@@ -11,7 +11,6 @@ import SoundPage from "./pages/SoundPage.vue";
 import SystemPage from "./pages/SystemPage.vue";
 import TimePage from "./pages/TimePage.vue";
 import { useClock } from "../composables/useClock";
-import { useClockScale } from "../composables/useClockScale";
 import { useSettings } from "../composables/useSettings";
 import { useStudioLauncher } from "../composables/useStudioLauncher";
 import { useTheme } from "../composables/useTheme";
@@ -26,8 +25,6 @@ const { settings, loaded, error, flush, load } = useSettings();
 const { launch } = useStudioLauncher();
 const { now } = useClock();
 const { current: currentTheme, profile, backgroundUrl, digitUrl } = useTheme();
-/** 左栏预览按容器自适应，「时钟缩放」只做阻尼演示，见 useClockScale。 */
-const { panelScale } = useClockScale();
 
 /** 版本号只在页脚出现；启动时取一次就够。 */
 const versionText = ref("");
@@ -204,7 +201,7 @@ onBeforeUnmount(() => {
                 :font="profile.font"
                 :brightness="profile.brightness"
                 variant="panel"
-                :preview-scale="panelScale"
+                :scale="profile.clockScale"
               />
             </div>
           </div>
@@ -430,8 +427,11 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   /* 标题与钟面作为一组居中：只在钟面上加 margin:auto 会把标题顶到栏口，
-     两者之间裂出一道空档。 */
+     两者之间裂出一道空档。竖屏主屏下舞台会高于栏高，safe center 改为从顶部排，
+     整组可在栏内滚动，不会把快捷设置裁掉。 */
   justify-content: center;
+  justify-content: safe center;
+  overflow-y: auto;
   padding: 12px 0 14px;
 }
 
@@ -476,10 +476,9 @@ onBeforeUnmount(() => {
 
 /* 钟面是一条居中的「屏幕」带，不是整栏铺满：默认主题本来就深，
    铺满整栏会变成一大块黑，把右边的设置压得看不见。
-   高度随窗口长一点，但封顶 280px，再高就只是浪费灰色留白。 */
+   宽高比由 .stage 统一跟随主屏（--screen-aspect）；圆角按「内屏」档 4px。 */
 .clock-stage {
   flex: none;
-  height: clamp(176px, 40vh, 280px);
   border: 0;
   border-radius: 4px;
 }

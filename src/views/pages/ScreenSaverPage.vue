@@ -189,7 +189,7 @@ onMounted(refresh);
   padding: 14px 14px;
   margin-bottom: 14px;
   border: 1px solid var(--ui-divider-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-panel);
   background: var(--ui-hero);
 }
 

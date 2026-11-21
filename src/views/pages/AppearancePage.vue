@@ -6,7 +6,7 @@ import { computed } from "vue";
 import FlipClock from "../../components/clock/FlipClock.vue";
 import FontPicker from "../../components/theme/FontPicker.vue";
 import { useClock } from "../../composables/useClock";
-import { previewScaleOf, useClockScale } from "../../composables/useClockScale";
+import { useClockScale } from "../../composables/useClockScale";
 import { useSettings } from "../../composables/useSettings";
 import { useStudioLauncher } from "../../composables/useStudioLauncher";
 import { useToast } from "../../composables/useToast";
@@ -308,7 +308,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
                 :show-colon="cardProfile(theme).showColon"
                 :font="cardProfile(theme).font"
                 :brightness="cardProfile(theme).brightness"
-                :preview-scale="previewScaleOf(cardProfile(theme).clockScale)"
+                :scale="cardProfile(theme).clockScale"
                 variant="panel"
               />
             </span>
@@ -474,14 +474,13 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
    套了框就变成卡表，五张卡并排会像商品列表。 */
 .theme-grid {
   display: grid;
-  /* 三列：五个内置主题刚好排成 3 + 2，空位留给「新建」。
-     两列太松、四列会把样品压成一条横幅。 */
-  grid-template-columns: repeat(auto-fill, minmax(198px, 1fr));
+  /* 两列：样卡保持足够大，才能和左栏实时预览对上。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px 12px;
-  /* 左右留出缩放余量：卡片悬停放大 3.5% 时每边外扩约 3.6px，
-     贴着 .page-scroll 的裁剪线会被削掉边框。8px 留足缓冲，
-     125% DPI 下也不会再贴边；列宽只从 205 收到 200，仍是三列。 */
-  padding: 0 8px;
+  /* 左右留出选中环与悬停放大的余量：选中环 4px + 悬停放大 3.5%
+     每边约 3.6px，贴着 .page-scroll 的裁剪线会削掉左/右边框；
+     12px 在 125% DPI 与亚像素取整下也不会再贴边。 */
+  padding: 0 12px;
 }
 
 .theme-cell {
@@ -606,7 +605,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
 /* 新建：一块空样本，不是虚线卡片。虚线卡片是「占位符」的语汇，
    这里要的是「再来一块」的语汇。外框与普通卡片的 .theme-pick 同构
    （同样的 padding / 边框 / gap / 宽高比），尺寸才对得上。 */
-/* 新建卡与主题卡同构：**整块料连名字行一起填**，中间是 2.3 比例的钟面位，
+/* 新建卡与主题卡同构：**整块料连名字行一起填**，中间是与主屏同比例的钟面位，
    只是料用界面底色、名字用灰的——它不指向任何主题，不该借某个主题的颜色。
    以前是「带边框的空盒子 + 伪元素撑高」，在一排色块里像个缺口。 */
 .new-theme {
@@ -615,7 +614,7 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   gap: 6px;
   padding: 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-panel);
   /* 用第三层灰（--ui-surface-3）而不是第二层（--ui-surface-2）：后者在白底与抽屉的渐变底上
      几乎看不出来，一整块料就成了"浮着的两个字"。 */
   background: var(--ui-surface-3);
@@ -633,16 +632,6 @@ async function removeTheme(theme: ThemeSpec): Promise<void> {
   color: var(--ui-text-secondary);
 }
 
-.new-stage {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 2.3;
-  border-radius: 2px;
-  /* 与整块料同色：主题卡里那格「钟面」之所以有色差，是因为主题自己有背景色；
-     新建卡没有主题，再垫一层白底就成了「块里套块」。 */
-  background: transparent;
-}
 
 .new-theme .plus {
   font-size: 20px;
