@@ -809,21 +809,27 @@ pub fn load(app: &AppHandle) -> Settings {
         }
     };
 
+    settings_from_value(&value)
+}
+
+/// 把一份已解析的 JSON 还原成配置。与文件读取分开，测试才能覆盖「写盘再读回」。
+fn settings_from_value(value: &serde_json::Value) -> Settings {
     let mut settings = Settings::default();
     if let Some(v) = value.get("schemaVersion").and_then(|v| v.as_u64()) {
         settings.schema_version = v as u32;
     }
-    settings.appearance = section(&value, "appearance").unwrap_or_default();
+    settings.appearance = section(value, "appearance").unwrap_or_default();
     // 主题 id 现在是字符串，serde 不会拒绝「neon-pink」这种未知值。
     // 读盘时必须归一一次，否则手改配置或删掉自定义主题后，钟面会套用空主题。
     // 归一同时补齐/收敛每个主题的钟面配置（ADR-0022）。
     normalize_appearance(&mut settings.appearance);
-    settings.screensaver = section(&value, "screensaver").unwrap_or_default();
-    settings.launch = section(&value, "launch").unwrap_or_default();
-    // 这一段曾经漏过 system，造成「保存成功、重启回默认」。新段必须显式加载，
-    // 哪怕默认值就是想要的——漏了就是静默失败。
-    settings.ui = section(&value, "ui").unwrap_or_default();
-    settings.registration = section(&value, "registration").unwrap_or_default();
+    settings.screensaver = section(value, "screensaver").unwrap_or_default();
+    settings.launch = section(value, "launch").unwrap_or_default();
+    // 每一段都必须显式加载。曾经漏过 system，造成「开关保存成功、重启回默认」——
+    // 默认值恰好等于旧行为，所以这个问题在界面上完全看不出来。
+    settings.system = section(value, "system").unwrap_or_default();
+    settings.ui = section(value, "ui").unwrap_or_default();
+    settings.registration = section(value, "registration").unwrap_or_default();
     settings.schema_version = SCHEMA_VERSION;
     settings
 }
@@ -1282,6 +1288,18 @@ mod tests {
         let settings: Settings = serde_json::from_value(raw).expect("老配置应能反序列化");
         // 老配置没有 system 段时，缺省行为必须是「关窗退到托盘」，否则托盘成了孤儿。
         assert!(settings.system.close_to_tray);
+    }
+
+    /// 回归：load() 曾漏加载 system 段，closeToTray=false 存盘后重启又变回 true。
+    /// 这个测试故意走「JSON → 配置」这条真实读盘路径，而不是直接 deserialize Settings。
+    #[test]
+    fn close_to_tray_false_survives_a_load() {
+        let raw = serde_json::json!({
+            "schemaVersion": 4,
+            "system": { "closeToTray": false }
+        });
+        let settings = settings_from_value(&raw);
+        assert!(!settings.system.close_to_tray);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 [package]
 name = "flipclock"
-version = "1.1.0"
+version = "1.1.1"
 description = "FlipClock - a mechanical split-flap clock for Windows with a real .scr screen saver entry"
 authors = ["dd"]
 edition = "2024"

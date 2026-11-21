@@ -22,3 +22,6 @@
 - Tauri 2（MIT / Apache-2.0）
 - Vue 3（MIT）
 - WebView2 Runtime（Microsoft，随 Windows 10/11 分发）
+- tauri-plugin-aptabase 1.3.0（MIT）—— 匿名使用统计上报。官方构建启用；
+  源码构建未配置 app key 时插件禁用，不发送任何事件。见
+  <https://github.com/aptabase/tauri-plugin-aptabase>

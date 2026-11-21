@@ -5,128 +5,138 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue" alt="Windows 10/11 x64">
-  <img src="https://img.shields.io/badge/languages-zh%20%C2%B7%20en-orange" alt="Chinese and English docs">
-  <img src="https://img.shields.io/badge/data-local%20only-green" alt="Local only">
-  <img src="https://img.shields.io/badge/release-v1.1.0-green" alt="v1.1.0">
+  <img src="https://img.shields.io/badge/docs-zh%20%C2%B7%20en-orange" alt="Chinese and English docs">
+  <img src="https://img.shields.io/badge/privacy-no%20personal%20data-green" alt="No personal data">
+  <img src="https://img.shields.io/badge/release-v1.1.1-green" alt="v1.1.1">
 </p>
 
 <p align="center"><img src="./assets/screenshots/clock-classic-dark.jpg" alt="FlipClock full-screen clock, classic dark theme, two digits per card" width="880"></p>
 
-## What it does
+## Download
 
-FlipClock turns a Windows desktop into a mechanical split-flap clock, with the flip animation and its click generated at runtime — no audio files to ship.
+Windows 10/11 x64. Pick one:
 
-- **Themes** — five built-in themes; six parts such as background, card, and digits with selectable materials and colours, plus custom images. Each theme carries its own clock profile, so switching themes switches the whole clock face.
-- **Clock face** — one or two digits per card, 24/12-hour time, optional date, seconds, and separator dots; adjustable scale, brightness, and digit font. Import local fonts (ttf / otf / woff / woff2) for the digits; files are copied into the configuration directory.
-- **Editing** — double-click the clock to open full-screen setup: change settings in a drawer while watching the result. Save writes once; Discard rolls everything back.
-- **Window** — two-column Settings with a live preview and five tabs. Interface language and UI appearance (system / light / dark) are selectable; appearance changes only the shell, never the clock face.
-- **Config bundle** — export themes, fonts, and preferences from **System**, then choose what to restore on import. Custom themes and fonts are merged, never deleted.
-- **Running** — system tray, autostart, primary or all monitors. The same binary is also a registerable `.scr` screen saver, installed per user without administrator rights.
+| Build | File | Notes |
+| --- | --- | --- |
+| Installed | [`FlipClock_1.1.1_x64-setup.exe`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-setup.exe) | Per-user install; no administrator rights; in-app updates |
+| Portable | [`FlipClock_1.1.1_x64-portable.zip`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-portable.zip) | Unzip and run; updates must be downloaded manually |
 
-<p align="center"><img src="./assets/screenshots/clock-black-label-seconds.jpg" alt="Black Label Gold theme with seconds and date" width="880"></p>
+[GitHub Releases](https://github.com/ShiXiongZhiDao/FlipClock/releases) ·
+[Gitee mirror](https://gitee.com/ShiXiongZhiDao/FlipClock/releases)
 
-## What it is not
+WebView2 is included with Windows 10/11. If it is missing, the installer fetches it.
 
-- **Not a web page.** It is a native Windows app; the clock UI runs locally in WebView2.
-- **Not an alarm, timer, or calendar.** It tells the time and, optionally, the date. Nothing rings.
-- **Not a replacement for the Windows lock screen.** It is a screensaver you choose in the Windows dialog, plus a full-screen mode you start yourself.
-- **Not a cloud service.** There is no account, no sync, and no cloud storage.
-- **Not cross-platform.** Windows 10/11 x64 only. The Windows system-preview hook (`/p <HWND>`) is intentionally unsupported: the process exits without creating a window.
+## What it is
 
-## Why this exists
+FlipClock is a mechanical split-flap clock for the Windows desktop **and** a real `.scr`
+screen saver registered with Windows — the same binary does both. The flip animation and
+its click are generated at runtime, so there are no audio files to ship.
 
-A split-flap clock is nice to look at, but most desktop versions are either a browser tab (gone when the browser closes) or a screensaver with no settings. This one is built to be both: the same binary runs as a normal app and as a genuine `.scr` registered with Windows. The flip sound is generated with the Web Audio API, so the download stays small and nothing is fetched at runtime. All appearance choices live in one Settings window and take effect immediately.
+## Highlights
 
-## Compared with the usual ways
-
-| | Windows built-in screensaver | A clock website | FlipClock |
-| --- | --- | --- | --- |
-| Runs when Windows locks the screen | Yes | No | Yes, as a real `.scr` |
-| Needs a browser or a tab | No | Yes | No |
-| Mechanical flip animation | No | Sometimes | Yes, four-layer CSS 3D leaves |
-| Flip sound | No | Usually muted | Synthesised on each displayed change |
-| Themes, digit layout, fonts, brightness | No | Varies | Yes, all in Settings |
-| Works offline | Yes | Usually no | Yes, except the optional update check |
-| Needs administrator rights | No | No | No — installed per user |
+- **Themes** — five built-in themes, each carrying its own clock profile; custom themes
+  built from six parts with matte, metallic, or soft materials, plus background and digit images.
+- **Clock face** — one or two digits per card, 24/12-hour time, optional date, seconds, and
+  separator dots; adjustable scale, brightness, and clock font.
+- **Editing** — double-click the clock for full-screen setup: change values in a drawer while
+  watching the result. Save writes once; Discard rolls everything back.
+- **Window** — two-column Settings with a live preview. Interface language and UI appearance
+  (system / light / dark) are separate from the clock face.
+- **Config bundle** — export themes, fonts, and preferences from **System**, then choose what
+  to restore on import. Custom themes and fonts are merged, never deleted.
+- **Running** — system tray, autostart, primary or all monitors. The same binary registers
+  as a per-user `.scr` without administrator rights.
 
 ## Screenshots
 
-The two full-screen images above show the classic dark theme with two digits per card, and the Black Label Gold theme with seconds and date. The interface language can follow the system or be set to Chinese or English; the five images below show the Chinese UI. The top row is the Settings window in light and dark, the middle row is the **Time** tab of the full-screen setup drawer in light and dark, and the last one is a custom theme combining a background image with a digit texture. UI appearance never touches the clock face — that is decided by the theme.
+Black Label Gold with seconds and date; a custom theme combining a background image with a
+digit texture; the Settings window; and the full-screen setup drawer.
+
+<p align="center"><img src="./assets/screenshots/clock-black-label-seconds.jpg" alt="Black Label Gold theme with seconds and date" width="880"></p>
+<p align="center"><img src="./assets/screenshots/clock-custom-texture.jpg" alt="Custom theme with background image and digit texture" width="880"></p>
 
 | Settings · light UI | Settings · dark UI |
 | --- | --- |
-| <img src="./assets/screenshots/zh/settings-appearance-light.jpg" alt="Settings window with light UI" width="700"> | <img src="./assets/screenshots/zh/settings-appearance-dark.jpg" alt="Settings window with dark UI" width="700"> |
+| <img src="./assets/screenshots/zh/settings-appearance-light.jpg" alt="Settings window with the light UI" width="700"> | <img src="./assets/screenshots/zh/settings-appearance-dark.jpg" alt="Settings window with the dark UI" width="700"> |
 
 | Full-screen setup · light drawer | Full-screen setup · dark drawer |
 | --- | --- |
-| <img src="./assets/screenshots/zh/fullscreen-setup-light.jpg" alt="Light full-screen setup drawer" width="700"> | <img src="./assets/screenshots/zh/fullscreen-setup-dark.jpg" alt="Dark full-screen setup drawer" width="700"> |
+| <img src="./assets/screenshots/zh/fullscreen-setup-light.jpg" alt="Full-screen setup with the light drawer" width="700"> | <img src="./assets/screenshots/zh/fullscreen-setup-dark.jpg" alt="Full-screen setup with the dark drawer" width="700"> |
 
-<p align="center"><img src="./assets/screenshots/clock-custom-texture.jpg" alt="Custom theme with background image and digit texture" width="880"></p>
+The interface language can follow the system or be set to Chinese or English; these UI
+screenshots show Chinese. UI appearance never touches the clock face — the theme decides that.
 
-## Privacy and boundaries
+## Quick start
 
-- No personal information is collected.
-- No access to the camera, microphone, file contents, or clipboard.
+1. **Install** — run the setup (or unzip the portable build) and open FlipClock.
+2. **Make it yours** — in Settings, pick a theme under **Appearance**, then set time format,
+   date, seconds, and digit layout under **Time & Date**. Changes save as you go.
+3. **Use it as a screen saver** — **Settings → Saver → Install and Set as Current Screen
+   Saver**, then set the wait time in Windows.
 
-## How to install
+Closing the Settings window hides it to the tray by default; right-click the tray icon →
+**Quit** to exit.
 
-Download a release from <https://github.com/ShiXiongZhiDao/FlipClock/releases>.
+Full steps: [Quick start](./docs/guide/en/quick-start.md) ·
+[Screen saver](./docs/guide/en/screensaver.md).
 
-- **Installed build** — `FlipClock_<version>_x64-setup.exe`. Installs for the current user; no administrator rights required. Open **System → About** in the app to check for and install updates.
-- **Portable build** — `FlipClock_<version>_x64-portable.zip`. Unzip and run. It can check for updates but has no installer to run them, so new versions must be downloaded manually.
-- **Gitee mirror** — <https://gitee.com/ShiXiongZhiDao/FlipClock/releases> carries the same release assets.
+## Requirements and limits
 
-To use it as a screen saver, open Settings → **Screen Saver** → *Install and set as current screen saver*. The component is copied next to the app and registered for the current user. You can always restore your previous screen saver from the same page.
+- **Windows 10/11 x64 only.** No macOS, Linux, or Windows ARM build.
+- **WebView2 required.** It ships with Windows 10/11; the installer fetches it if missing.
+- **No administrator rights.** The app installs per user in `%LOCALAPPDATA%\FlipClock`, and
+  the screen saver registers under the current user.
+- **Monitors:** the screen saver covers the primary monitor or all monitors. A specific
+  subset is not supported.
+- **System preview:** the `/p <HWND>` hook is not supported; the process exits without
+  creating a window.
+- **Not a lock-screen replacement, alarm, timer, calendar, or cloud service.** There is no
+  account and no sync.
+- **The portable build cannot update in place.** Download the new zip.
 
-Command line:
+## Privacy
 
-| Argument | Effect |
-| --- | --- |
-| *(none)* | Follows the no-argument policy in Settings (Settings window or full-screen clock). |
-| `/c` | Open the Settings window. |
-| `/s` | Start the screen saver; any input exits it. |
-| `/p <HWND>` | Not supported — the process exits without creating a window. |
+- **No personal data.** No account, no name or email, no device or installation ID, and no
+  access to your files, clipboard, camera, or microphone.
+- **Anonymous usage analytics.** Official builds send five anonymous events (app start,
+  configuration snapshot, Settings opened, feature toggled, update check) to Aptabase. No
+  free text, no persisted identifier, no in-app switch. Builds from source without the app
+  key send nothing.
+- **Network requests.** An update check is attempted after the Settings window opens, and
+  the About section loads three images. There is no sync.
+- **Local data.** Settings, themes, fonts, and imported images stay in
+  `%APPDATA%\com.dd.shixiongzhidao\`; imported files are copied there.
 
-## FAQ
+Full details: [Privacy](./docs/guide/en/privacy.md).
+
+## FAQ and documentation
 
 **Is the `.scr` really the same program?**
-Yes. `FlipClock.scr` and `FlipClock.exe` are byte-identical copies; only the file name differs. Windows decides how to launch it from the extension and the arguments.
+Yes. `FlipClock.scr` and `FlipClock.exe` are byte-identical copies; Windows decides how to
+launch it from the extension and the arguments.
 
 **Do I need administrator rights?**
-No. The screensaver component and the autostart entry are both registered under the current user's registry hive.
-
-**Why did I get a "version mismatch" message on the Screen Saver page?**
-The registered `.scr` is older than the app you are running. Click *Reinstall screen saver component* to replace it with the matching binary.
+No. The screen saver and the autostart entry are both registered under the current user.
 
 **I closed the window but the tray icon is still there. Is it stuck?**
-No. Closing the Settings window hides it to the tray by default. Left-click the tray icon to reopen it, or right-click → *Quit* to exit. You can turn this behaviour off in Settings → System.
+No. Closing hides the Settings window to the tray by default. Right-click the icon → *Quit*
+to exit, or turn this off in System → Startup & Window.
 
-**Can I use it on more than one monitor?**
-Yes. Settings → Screen Saver offers *Primary monitor* and *All monitors*. A specific subset of monitors is not supported yet.
+**Why does the Saver page say "Version Mismatch"?**
+The registered `.scr` is older than the app you are running. Close any running saver, then
+click *Redeploy Screen Saver Component*.
 
-**Does 12-hour mode show `9` or `09`?**
-`09`. Both 12-hour and 24-hour modes zero-pad the hour, so the two digit layouts stay symmetrical.
+**How do I move my themes and fonts to another machine?**
+Export a config bundle from **System**, then import it on the other machine and select what
+to restore. Custom themes and fonts are merged; preferences overwrite.
 
-**Does autostart open a big clock over my desktop at login?**
-No. Autostart launches the app with `--tray`, which only puts an icon in the tray. The status is read from the registry each time, so disabling it in Task Manager is reflected in Settings.
-
-**What happens if I launch FlipClock again while it is already running?**
-The existing window is brought forward; no second background instance is created. Screen saver (`/s`) launches are exempt so Windows can always start one.
-
-**Why does the clock get clipped at large scale?**
-Clock scale goes up to 450% by design. Above a certain size the cards extend past the screen edge rather than being silently shrunk, so what you see in the preview is what you get.
-
-**What is the difference between UI appearance and a theme?**
-UI appearance changes only the light/dark look of the Settings window and the full-screen setup drawer. The clock face is decided by the theme.
-
-**Will a custom theme break if I move its images?**
-No. Images are copied into the configuration directory when you pick them, so moving or deleting the originals does not affect the theme.
-
-**What happens if I delete an imported font file?**
-Nothing — the font is copied into the configuration directory. But if you remove the font inside the app, themes using it fall back to Bebas Neue.
-
-**How do I take my themes and fonts to another machine?**
-Export a config bundle from **System**, then import it on the other machine and select what to restore. Custom themes and fonts are merged rather than overwriting what is already there; built-in clock profiles and the preferences you select do overwrite their counterparts.
+Guides: [Quick start](./docs/guide/en/quick-start.md) ·
+[Screen saver](./docs/guide/en/screensaver.md) ·
+[Themes and fonts](./docs/guide/en/themes-and-fonts.md) ·
+[Backup and restore](./docs/guide/en/backup-and-restore.md) ·
+[Privacy](./docs/guide/en/privacy.md) ·
+[Troubleshooting](./docs/guide/en/troubleshooting.md) ·
+[All guides](./docs/guide/en/README.md).
 
 ## Build from source
 
@@ -140,18 +150,22 @@ pnpm build:app      # release build, frontend embedded in the binary
 pnpm scr            # copy the release binary to dist-scr/FlipClock.exe and .scr
 ```
 
-Do **not** use a bare `cargo build --release`: without the `custom-protocol` feature the frontend is not embedded, and the app will only show a "localhost refused connection" page. Building an installer additionally requires `TAURI_SIGNING_PRIVATE_KEY`, because update packages must be signed.
+Do **not** use a bare `cargo build --release`: without the `custom-protocol` feature the
+frontend is not embedded, and the app will only show a "localhost refused connection" page.
+Building an installer additionally requires `TAURI_SIGNING_PRIVATE_KEY`, because update
+packages must be signed.
 
-See [CHANGELOG.md](./CHANGELOG.md) for what changed between releases, and [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for dependency and font attribution.
+## License and credits
 
-## License
-
-GNU General Public License v3.0 — see [LICENSE](./LICENSE). The bundled Bebas Neue font is distributed under the SIL Open Font License; see `src/assets/fonts/OFL.txt` and [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+GNU General Public License v3.0 — see [LICENSE](./LICENSE). The bundled Bebas Neue font is
+distributed under the SIL Open Font License; see `src/assets/fonts/OFL.txt` and
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for font and dependency attribution.
 
 ## ☕ Support the author
 
-If FlipClock made your desktop a little nicer, you can buy the author a coffee — projects like this
-live on that. The QR codes below are loaded from a public image repository, not bundled with the app.
+If FlipClock made your desktop a little nicer, you can buy the author a coffee — projects
+like this live on that. The QR codes below are loaded from a public image repository, not
+bundled with the app.
 
 | Alipay | WeChat Pay |
 | --- | --- |
