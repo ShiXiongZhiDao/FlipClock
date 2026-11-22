@@ -4,15 +4,15 @@
  * 图片存在 `<app_config_dir>/themes/<主题id>/<文件名>`，配置里只存文件名。
  * 需要把绝对路径转成 WebView 能加载的地址，所以启动时向 Rust 取一次根目录。
  */
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { ref } from "vue";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
-import { isTauri } from "../env";
+import { bootAssetBase } from "../bootAssets";
+import { readBoot } from "../../types/boot";
 
 // 用 ref 而不是普通变量：路径是异步取的，模板里的 themeAssetUrl 要能追踪到它，
-// 否则路径到位后画面不会重算，图片永远不显示。
-const base = ref<string | null>(null);
-let ready: Promise<void> | null = null;
+// 否则路径到位后画面不会重算，图片永远不显示。沉浸式窗口的启动载荷里已经带着
+// 根目录，首帧就要拼出图片地址，等不了那次 IPC（ADR-0030 修订）。
+const { base, init } = bootAssetBase(readBoot().assets?.themesDir, "themes_dir_path");
 const cache = new Map<string, string>();
 
 /**
@@ -20,11 +20,7 @@ const cache = new Map<string, string>();
  * 所以放在 useSettings 的 load 里，而不是某个视图的 onMounted。
  */
 export function initThemeAssets(): Promise<void> {
-  ready ??= (async () => {
-    if (!isTauri()) return;
-    base.value = await invoke<string>("themes_dir_path").catch(() => null);
-  })();
-  return ready;
+  return init();
 }
 
 /**

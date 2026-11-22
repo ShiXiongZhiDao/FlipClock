@@ -69,11 +69,28 @@ pub fn set_locale(app: AppHandle, locale: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
+    // ADR-0030 的验收钩子：把这次 IPC 拖慢，逼出「首帧还没拿到配置」的时序。
+    // 注入生效时，拖慢到 2s 仍应直接看到用户选的主题；没有注入的话会先闪
+    // 经典碳灰。只在调试构建里存在，正式版整段被裁掉。
+    #[cfg(debug_assertions)]
+    debug_settings_delay();
+
     state
         .settings
         .lock()
         .map(|s| s.clone())
         .map_err(|_| AppError::ConfigUnavailable.into())
+}
+
+#[cfg(debug_assertions)]
+fn debug_settings_delay() {
+    let Ok(raw) = std::env::var("FLIPCLOCK_DEBUG_SETTINGS_DELAY_MS") else {
+        return;
+    };
+    match raw.parse::<u64>() {
+        Ok(ms) => std::thread::sleep(std::time::Duration::from_millis(ms)),
+        Err(_) => eprintln!("FlipClock: FLIPCLOCK_DEBUG_SETTINGS_DELAY_MS 不是毫秒数：{raw}"),
+    }
 }
 
 #[tauri::command]
@@ -195,9 +212,8 @@ pub fn open_about_link(key: String) -> Result<(), String> {
 pub async fn leave_fullscreen_clock(app: AppHandle) -> Result<(), String> {
     // 同 preview_screensaver：这里可能现场创建设置窗口，不能占着主线程。
     screensaver::open_settings_window(&app)?;
-    if let Some(window) = app.get_webview_window("clock") {
-        let _ = window.close();
-    }
+    // 先藏再关：否则全屏时钟会先露约 0.1s 的窗口底色再消失（见 close_window）。
+    screensaver::close_window(&app, "clock");
     Ok(())
 }
 
@@ -234,7 +250,7 @@ pub fn get_theme_preview() -> Result<Option<String>, String> {
 /// 关窗同样走 async：销毁窗口也要事件循环参与。
 #[tauri::command]
 pub async fn close_theme_preview(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(screensaver::MODE_THEME_PREVIEW) {
+    if let Some(window) = app.get_webview_window(screensaver::MODE_FULLSCREEN_SETUP) {
         // 关窗失败不能吞：以前这里是 `let _ = window.close()`，失败后照样发
         // theme-preview-closed，前端于是 resetStudio() 把草稿清了——窗口却留在
         // 屏上。用户看到的是「点了没反应」，丢掉的却是整场草稿。
@@ -324,6 +340,19 @@ pub fn import_theme_image(
     std::fs::copy(source, dir.join(&name)).map_err(|error| AppError::ThemeImageCopyFailed {
         detail: error.to_string(),
     })?;
+
+    // 启动缩略图（ADR-0031 修订）：屏保出现时先铺它的模糊版，别给一块纯黑。
+    // 它是派生文件，解码整图要几百毫秒，放后台生成；失败只留痕，下一次仍是底色。
+    if kind == "background" {
+        let image_path = dir.join(&name);
+        let theme_dir = dir.clone();
+        let log_id = theme_id.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = crate::theme_preview::write(&image_path, &theme_dir) {
+                eprintln!("FlipClock: 主题缩略图生成失败 {log_id}: {error}");
+            }
+        });
+    }
     Ok(name)
 }
 
@@ -344,6 +373,22 @@ pub fn remove_theme_image(
         std::fs::remove_file(&path).map_err(|error| AppError::ThemeImageCopyFailed {
             detail: error.to_string(),
         })?;
+    }
+    // 删的是背景图就连缩略图一起删，否则下次启动会铺一张已经不存在的图。
+    let is_background = app
+        .state::<AppState>()
+        .settings
+        .lock()
+        .ok()
+        .and_then(|settings| {
+            settings
+                .custom_theme(&theme_id)
+                .and_then(|spec| spec.background.image.clone())
+        })
+        .map(|image| image == filename)
+        .unwrap_or(false);
+    if is_background {
+        crate::theme_preview::forget(&settings::themes_dir(&app)?.join(&theme_id));
     }
     Ok(())
 }

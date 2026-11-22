@@ -8,6 +8,7 @@ import "./styles/global.css";
 import "./styles/ui.css";
 
 import { watchStageAspect } from "./lib/stageAspect";
+import { preloadClockAssets } from "./lib/theme/preload";
 import { readBoot } from "./types/boot";
 
 /**
@@ -27,4 +28,17 @@ if (bootMode === "settings" || bootMode === "theme-preview") {
   watchStageAspect();
 }
 
-createApp(App).mount("#app");
+/**
+ * 屏保与全屏时钟先等主题图片与导入字体就位再挂载（ADR-0030 修订）。
+ *
+ * 不等的话第一帧是纯色底 + 回退字体，资产到位后再跳一次；自定义主题的底色
+ * 常常接近经典碳灰，看起来就像「先闪了一下默认主题」。
+ */
+async function bootstrap(): Promise<void> {
+  if (bootMode === "screensaver" || bootMode === "clock") {
+    await preloadClockAssets();
+  }
+  createApp(App).mount("#app");
+}
+
+void bootstrap();

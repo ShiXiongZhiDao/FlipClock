@@ -21,15 +21,15 @@ the code, it is phrased as something to check rather than a fact.
   selection. Choosing another saver removes FlipClock; install it again to bring it back.
 - **Windows Preview is blank** — `/p` system preview is not supported by design. Use
   **Preview Screen Saver** in the app.
-- **Outdated / Update Needed** — close any running saver, then click
+- **Update Needed** — close any running saver, then click
   **Update Screen Saver**.
 - **The wait time is ignored** — it is a Windows setting, not a FlipClock setting. Open it
   from the Saver page.
 
 ## The tray icon stays after closing the window
 
-That is the default: closing hides the window to the tray. Right-click the icon → **Quit**
-to exit, or turn off **Minimize to system tray when closing the window** in
+That is the default: closing destroys the window; the app stays in the tray. Right-click the icon → **Quit**
+to exit, or turn off **Keep the app in the system tray when closing the window** in
 System → Startup & Window. In 1.1.0 this switch did not survive a restart; 1.1.1 fixes it.
 
 ## Updates fail

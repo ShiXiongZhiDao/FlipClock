@@ -5,10 +5,11 @@
  * 再交给 FontFace——不依赖 MIME，也不给 WebView 任意文件路径。
  * 测量只对导入字体做：内置字体的字族与比例来自 fontRegistry。
  */
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { reactive, ref } from "vue";
 
-import { isTauri } from "./env";
+import { bootAssetBase } from "./bootAssets";
+import { readBoot } from "../types/boot";
 import {
   BUILTIN_FONT_DEFINITIONS,
   isBuiltinFontId,
@@ -24,8 +25,9 @@ export interface FontMetrics extends ClockFontMetrics {
   uneven: boolean;
 }
 
-const base = ref<string | null>(null);
-let ready: Promise<void> | null = null;
+// 沉浸式窗口的启动载荷里带着字体根目录，先落上：首帧前要能取到字体文件
+// （ADR-0030 修订）。取不到就退回一次 IPC。
+const { base, init } = bootAssetBase(readBoot().assets?.fontsDir, "fonts_dir_path");
 
 /** 当前设置里的字体库快照；由 useSettings / 全屏配置窗口调用 setFontLibrary 更新。 */
 const library = ref<CustomFont[]>([]);
@@ -39,11 +41,7 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
 export function initFontAssets(): Promise<void> {
-  ready ??= (async () => {
-    if (!isTauri()) return;
-    base.value = await invoke<string>("fonts_dir_path").catch(() => null);
-  })();
-  return ready;
+  return init();
 }
 
 export function fontAssetUrl(entry: CustomFont): string | null {

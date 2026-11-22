@@ -454,6 +454,19 @@ pub fn is_safe_theme_id(id: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+impl Settings {
+    /// 按 id 找自定义主题；内置 id 与不安全 id 一律返回 None。
+    pub fn custom_theme(&self, id: &str) -> Option<&ThemeSpec> {
+        if !is_safe_theme_id(id) {
+            return None;
+        }
+        self.appearance
+            .custom_themes
+            .iter()
+            .find(|theme| theme.id == id)
+    }
+}
+
 /// 导入字体 id 必须是 `custom-` 前缀；内置 id 不能被字体库占用。
 pub fn is_safe_font_id(id: &str) -> bool {
     id.starts_with("custom-") && is_safe_theme_id(id)
@@ -688,7 +701,7 @@ pub struct ScreenSaverSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemSettings {
-    /// 关闭设置窗口时隐藏到托盘，而不是退出整个应用。
+    /// 关闭设置窗口时销毁窗口、应用留在托盘，而不是退出整个应用。
     #[serde(default = "yes")]
     pub close_to_tray: bool,
     /// 是否已经做过「默认自启」的初始化判定。

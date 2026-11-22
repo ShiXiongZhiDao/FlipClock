@@ -48,7 +48,7 @@ const windowsOff = computed(() => !props.error && saverWindowsOff(props.status))
   <section
     v-if="(status || error) && (!ready || justInstalled)"
     class="saver-strip"
-    :class="[tone, { compact }]"
+    :class="{ compact }"
     aria-live="polite"
   >
     <div v-if="!ready" class="strip-main">
@@ -85,33 +85,31 @@ const windowsOff = computed(() => !props.error && saverWindowsOff(props.status))
     </p>
 
     <p v-if="!error && justInstalled && ready" class="strip-note">
-      {{ t("saver.strip.waitHint") }} ·
+      {{ t("saver.waitHint") }} ·
       <button type="button" class="strip-link" @click="emit('open-settings')">
-        {{ t("saver.strip.open") }}
+        {{ t("saver.open") }}
       </button>
     </p>
   </section>
 </template>
 
 <style scoped>
+/* 与左栏其他段落同一种排版：只留一条上分隔线，不做卡片。 */
 .saver-strip {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 9px 10px;
+  padding: 10px 1px 0;
   margin-bottom: 12px;
-  border: 1px solid var(--ui-divider-strong);
-  border-radius: var(--radius-card);
-  background: var(--ui-hero);
+  border-top: 1px solid var(--ui-divider-strong);
 }
 
-/* 已就绪时收成一行灰字：没有要用户做的事，就不该继续占一块卡片。 */
+/* 已就绪时收成一行灰字：没有要用户做的事，就不该继续占一段。 */
 .saver-strip.compact {
   padding: 0 1px;
   margin-bottom: 10px;
-  border-color: transparent;
-  background: transparent;
+  border-top-color: transparent;
 }
 
 .strip-main {
@@ -159,14 +157,5 @@ const windowsOff = computed(() => !props.error && saverWindowsOff(props.status))
 .strip-link:hover {
   color: var(--ui-text);
   text-decoration-color: var(--ui-link-line-hover);
-}
-
-.saver-strip.err {
-  background: var(--ui-danger-soft);
-  border-color: transparent;
-}
-
-.saver-strip.warn {
-  border-color: var(--ui-line-hover);
 }
 </style>

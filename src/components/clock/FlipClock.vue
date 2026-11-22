@@ -243,6 +243,23 @@ const dateText = computed(() => {
   --unit: calc(1vmin * var(--user-scale, 1) * var(--row-fit, 1));
 }
 
+/* 窗口在钟面画出来之前铺的是主题底色（ADR-0031）。淡入 200ms 把「底色 → 钟面」
+   这一次硬切抹平；只给整屏形态，卡片里的小预览不需要入场动画。 */
+@media (prefers-reduced-motion: no-preference) {
+  .clock--stage {
+    animation: clock-in 200ms ease-out both;
+  }
+}
+
+@keyframes clock-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* 嵌在卡片里：**把这块预览卡当成一块屏幕**。
    单位与 stage 完全同源：stage 的 1vmin ↔ 面板的 1cqmin（容器短边的 1%），
    再乘同一个用户缩放与 --row-fit。于是卡片上的占屏比例就是真屏的占屏比例，

@@ -74,8 +74,8 @@ screenshots show Chinese. UI appearance never touches the clock face — the the
 3. **Use it as a screen saver** — **Settings → Saver → Install Screen Saver**, then set
    the wait time in Windows.
 
-Closing the Settings window hides it to the tray by default; right-click the tray icon →
-**Quit** to exit.
+Closing the Settings window closes it and keeps the app in the tray by default; right-click
+the tray icon → **Quit** to exit.
 
 Full steps: [Quick start](./docs/guide/en/quick-start.md) ·
 [Screen saver](./docs/guide/en/screensaver.md).
@@ -119,12 +119,12 @@ launch it from the extension and the arguments.
 No. The screen saver and the autostart entry are both registered under the current user.
 
 **I closed the window but the tray icon is still there. Is it stuck?**
-No. Closing hides the Settings window to the tray by default. Right-click the icon → *Quit*
-to exit, or turn this off in System → Startup & Window.
+No. Closing the Settings window closes it and keeps the app in the tray by default. Right-click
+the icon → *Quit* to exit, or turn this off in System → Startup & Window.
 
 **Why does the Saver page say "Update Needed"?**
 The registered `.scr` is older than the app you are running. Close any running saver, then
-click *Update Screen Saver*.
+click *Update Screen Saver*; the update also turns the Windows screen saver back on.
 
 **How do I move my themes and fonts to another machine?**
 Export a config bundle from **System**, then import it on the other machine and select what

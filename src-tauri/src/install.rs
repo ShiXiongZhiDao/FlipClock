@@ -10,12 +10,14 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use crate::errors::AppError;
+use crate::paths;
 use crate::platform;
 use crate::screensaver::AppState;
 use crate::settings;
 
 const SCRNSAVE_EXE: &str = "SCRNSAVE.EXE";
 const SCREEN_SAVE_ACTIVE: &str = "ScreenSaveActive";
+const SCREEN_SAVE_TIMEOUT: &str = "ScreenSaveTimeOut";
 /// 安装器把 `$INSTDIR` 写进卸载键的 `InstallLocation`（值带引号）。
 /// 安装时允许用户改目录，所以「是不是安装版」以这里为准，而不是猜默认路径。
 const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\FlipClock";
@@ -34,12 +36,6 @@ pub struct ScreenSaverStatus {
     pub windows_enabled: bool,
 }
 
-pub fn target_path() -> Result<PathBuf, String> {
-    let base = std::env::var("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .map_err(|_| String::from(AppError::NoLocalAppData))?;
-    Ok(base.join("FlipClock").join("FlipClock.scr"))
-}
 
 fn current_exe() -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|e| {
@@ -72,7 +68,7 @@ pub fn is_installed_build() -> bool {
         }
     }
 
-    match target_path() {
+    match paths::screensaver_target() {
         Ok(target) => {
             let installed = target.with_extension("exe");
             exe_text.eq_ignore_ascii_case(&installed.to_string_lossy())
@@ -86,22 +82,17 @@ pub fn is_installed_build() -> bool {
 /// （回滚点记的是「用户原来的屏保」，与版本无关）。
 ///
 /// 返回是否真的复制过。屏保正在跑时目标文件被占用，复制会失败；
-/// 那不是需要吞掉的错误，留给系统页显示「版本不匹配」让用户点一下重装。
+/// 那不是需要吞掉的错误，留给预览栏状态条与屏保页显示「需要更新」让用户点一下更新。
 pub fn refresh_if_outdated() -> Result<bool, String> {
     if !is_installed_build() {
         return Ok(false);
     }
 
-    let target = target_path()?;
-    let target_text = target.to_string_lossy().to_string();
-    let active = platform::read_desktop_string(SCRNSAVE_EXE).filter(|value| !value.is_empty());
-    let points_here = active
-        .as_deref()
-        .map(|value| value.eq_ignore_ascii_case(&target_text))
-        .unwrap_or(false);
+    let target = paths::screensaver_target()?;
+    let active = platform::read_desktop_string(SCRNSAVE_EXE);
 
     // 没装过组件（注册不指向我们）就别自作主张替用户装一个。
-    if !points_here || !target.exists() {
+    if !points_at_target(active.as_deref()) || !target.exists() {
         return Ok(false);
     }
 
@@ -168,8 +159,35 @@ fn screen_save_enabled(value: Option<&str>) -> bool {
     value.map(|v| v.trim() != "0").unwrap_or(true)
 }
 
+/// 屏保注册是否确实指向本组件的稳定路径。
+fn points_at_target(active: Option<&str>) -> bool {
+    let Some(active) = active.filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let Ok(target) = paths::screensaver_target() else {
+        return false;
+    };
+    active.eq_ignore_ascii_case(&target.to_string_lossy())
+}
+
+/// 当前 Windows 屏保是本组件且已启用时，返回它的空闲超时秒数。
+pub fn active_saver_timeout_seconds() -> Option<u64> {
+    let active = platform::read_desktop_string(SCRNSAVE_EXE);
+    if !points_at_target(active.as_deref()) {
+        return None;
+    }
+    let enabled = platform::read_desktop_string(SCREEN_SAVE_ACTIVE);
+    if !screen_save_enabled(enabled.as_deref()) {
+        return None;
+    }
+    platform::read_desktop_string(SCREEN_SAVE_TIMEOUT)?
+        .trim()
+        .parse()
+        .ok()
+}
+
 pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
-    let target = target_path()?;
+    let target = paths::screensaver_target()?;
     let target_text = target.to_string_lossy().to_string();
     let active = platform::read_desktop_string(SCRNSAVE_EXE).filter(|v| !v.is_empty());
     let screen_save_active = platform::read_desktop_string(SCREEN_SAVE_ACTIVE);
@@ -181,10 +199,7 @@ pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
         .map(|s| s.registration.rollback_scrnsave_exe.is_some())
         .unwrap_or(false);
 
-    let points_here = active
-        .as_deref()
-        .map(|value| value.eq_ignore_ascii_case(&target_text))
-        .unwrap_or(false);
+    let points_here = points_at_target(active.as_deref());
 
     let state = if !points_here {
         "notInstalled"
@@ -208,7 +223,7 @@ pub fn status(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
 }
 
 pub fn install(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
-    let target = target_path()?;
+    let target = paths::screensaver_target()?;
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| AppError::CreateInstallDirFailed {
             detail: e.to_string(),
@@ -245,6 +260,7 @@ pub fn install(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
     }
 
     platform::write_desktop_string(SCRNSAVE_EXE, &target_text)?;
+    // 安装、手动更新与修复共用此路径：按产品决定，三者都会把 Windows 屏保置为启用。
     platform::write_desktop_string(SCREEN_SAVE_ACTIVE, "1")?;
 
     status(app)
@@ -265,7 +281,7 @@ pub fn restore(app: &AppHandle) -> Result<ScreenSaverStatus, String> {
 
     // 只在「当前选的还是我们」时动注册表。用户后来换了别的屏保，
     // 这里再按旧回滚点写回去，等于把他的新选择也一起抹掉。
-    let target_text = target_path()?.to_string_lossy().to_string();
+    let target_text = paths::screensaver_target()?.to_string_lossy().to_string();
     let still_ours = platform::read_desktop_string(SCRNSAVE_EXE)
         .filter(|value| !value.is_empty())
         .map(|value| value.eq_ignore_ascii_case(&target_text))
@@ -317,7 +333,8 @@ pub fn open_windows_settings() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::screen_save_enabled;
+    use super::{points_at_target, screen_save_enabled};
+    use crate::paths;
 
     #[test]
     fn screen_save_active_defaults_to_enabled() {
@@ -325,5 +342,15 @@ mod tests {
         assert!(screen_save_enabled(Some("1")));
         assert!(!screen_save_enabled(Some("0")));
         assert!(!screen_save_enabled(Some(" 0 ")));
+    }
+
+    #[test]
+    fn registration_must_match_the_exact_target_path() {
+        let target = paths::screensaver_target().expect("测试环境应有 LOCALAPPDATA");
+        let target_text = target.to_string_lossy();
+        assert!(points_at_target(Some(&target_text)));
+        assert!(!points_at_target(Some(r"C:\other\FlipClock.scr")));
+        assert!(!points_at_target(Some("")));
+        assert!(!points_at_target(None));
     }
 }

@@ -4,12 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FlipClock</title>
+    <script>
+      // 窗口在 webview 画出第一帧之前就已经显示了（ADR-0031）。屏保与全屏时钟的
+      // 启动载荷带着当前主题的底色，这里在解析阶段就落成 CSS 变量——晚一步就会
+      // 先画出写死的近黑、再被主题色盖掉，那一下看起来就是「黑屏闪了一下」。
+      const boot = window.__FLIPCLOCK_BOOT__;
+      const bootBackground = boot?.windowBackground;
+      if (bootBackground) {
+        document.documentElement.style.setProperty("--fc-boot-bg", bootBackground);
+        // global.css 里靠这个属性把 body 的 --ui-bg 让位给主题底色。
+        document.documentElement.dataset.bootSurface = "";
+      }
+      // 带背景图的主题：铺一张 160px 缩略图，屏幕一亮就是照片的模糊版。
+      if (boot?.bootBackgroundImage) {
+        document.documentElement.style.setProperty(
+          "--fc-boot-image",
+          `url("${boot.bootBackgroundImage}")`,
+        );
+      }
+    </script>
     <style>
       html,
       body {
         margin: 0;
         height: 100%;
-        background: #0d0f10;
+        /* 兜底值与 screensaver.rs 的 SHELL_BACKGROUND 一致，改一处就要改另一处。 */
+        background: var(--fc-boot-bg, #0d0f10);
       }
     </style>
   </head>

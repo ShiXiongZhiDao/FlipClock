@@ -64,5 +64,5 @@ export function saverUiState(status: ScreenSaverStatus | null): SaverUiState | n
 }
 
 export function saverWindowsOff(status: ScreenSaverStatus | null): boolean {
-  return status?.state === "installed" && status.windowsEnabled === false;
+  return Boolean(status && status.state !== "notInstalled" && status.windowsEnabled === false);
 }

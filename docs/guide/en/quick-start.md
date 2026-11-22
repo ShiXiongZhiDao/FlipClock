@@ -23,7 +23,7 @@ Double-click `FlipClock.exe` (or the Start menu entry). By default the Settings 
 opens. If **System → Startup & Window → No-argument launch** is set to **Full-screen clock**,
 the clock opens instead.
 
-Closing the Settings window hides it to the system tray — the app is still running.
+Closing the Settings window closes it; the app stays in the system tray and keeps running.
 Right-click the tray icon → **Quit** to exit.
 
 ![Settings window with the light UI](../../../assets/screenshots/zh/settings-appearance-light.jpg)
@@ -36,15 +36,15 @@ The Settings window has a permanent preview on the left and five tabs on the rig
 - **Time & Date** — 24/12-hour, date line, seconds, separator dots, one or two digits per card.
 - **Sound** — flip sound and volume (only audible in the full-screen clock and the screen saver).
 - **Saver** — install and manage the Windows screen saver.
-- **System** — autostart, close-to-tray, no-argument launch, language, UI appearance,
+- **System** — autostart, stay in the tray when closing, no-argument launch, language, UI appearance,
   config bundle, reset, updates, About.
 
 Changes preview immediately and are written as you go; the Settings window has no Save button.
 
 ## 4. Quit or keep it in the tray
 
-- Close button: hides to the tray by default.
-- **System → Startup & Window → Minimize to system tray when closing the window**: turn it
+- Close button: closes the window and keeps the app in the tray by default.
+- **System → Startup & Window → Keep the app in the system tray when closing the window**: turn it
   off if you want the close button to exit the app.
 - **System → Startup & Window → Autostart**: starts with Windows, tray only, no window.
 

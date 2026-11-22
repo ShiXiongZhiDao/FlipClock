@@ -38,6 +38,9 @@ tauri-plugin-aptabase = "1"
 tauri-plugin-dialog = "2"
 # 只读文件头拿像素尺寸，不解码整图。三个 feature 覆盖允许的格式。
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+# 主题缩略图随启动载荷下发时编成 data URL（ADR-0031 修订）。依赖树里本来就有，
+# 加一条直接依赖不增加编译时间。
+base64 = "0.23"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # 配置包（ADR-0027）：只写 Stored 条目，图片/字体本身已压缩，
@@ -50,6 +53,7 @@ windows = { version = "0.62", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_System_Registry",
+  "Win32_System_SystemInformation",
   "Win32_Graphics_Gdi",
 ] }
 

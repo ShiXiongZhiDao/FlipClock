@@ -52,8 +52,11 @@ changes, the running session rebuilds itself.
 - Uninstalling FlipClock restores it automatically.
 - At startup the app compares the registered `.scr` with itself and refreshes the copy when
   they differ. If the copy cannot be replaced (the saver is running, or the file is locked),
-  the preview-column status strip says the saver is outdated and the Saver page shows
-  **Update Needed**. Close the saver, then click **Update Screen Saver**.
+  the preview-column status strip says the screen saver needs an update and the Saver page
+  shows **Update Needed**. Close the saver, then click **Update Screen Saver**.
+- **Update Screen Saver** and **Repair Screen Saver** follow the same path as the first
+  install: they point Windows at FlipClock again and set `ScreenSaveActive` to `1`.
+  The automatic refresh at startup only replaces the file and leaves the enabled state alone.
 
 ## Command line
 

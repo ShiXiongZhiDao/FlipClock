@@ -10,6 +10,7 @@ mod imp {
         RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY,
         HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_SZ, REG_VALUE_TYPE,
     };
+    use windows::Win32::System::SystemInformation::GetTickCount;
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetLastInputInfo, LASTINPUTINFO};
     use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, IsWindow};
 
@@ -92,6 +93,13 @@ mod imp {
         unsafe { GetLastInputInfo(&mut info) }
             .as_bool()
             .then_some(info.dwTime)
+    }
+
+    /// 系统范围内当前空闲秒数：从最后一次真实输入算起。
+    pub fn idle_seconds() -> Option<u64> {
+        let last = last_input_tick()?;
+        let now = unsafe { GetTickCount() };
+        Some(u64::from(now.wrapping_sub(last)) / 1000)
     }
 
     /// Windows 传进来的 HWND 属于不可信输入，必须验证。

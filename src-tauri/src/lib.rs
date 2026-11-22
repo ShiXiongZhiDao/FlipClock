@@ -4,9 +4,11 @@ mod config_bundle;
 mod errors;
 mod install;
 mod launch_mode;
+mod paths;
 mod platform;
 mod screensaver;
 mod settings;
+mod theme_preview;
 mod tray;
 
 use std::sync::Mutex;
@@ -128,6 +130,27 @@ pub fn run() {
                     Ok(false) => {}
                     Err(error) => eprintln!("FlipClock: 屏保组件没能刷新：{error}"),
                 });
+            }
+
+            // 主题背景图的启动缩略图（ADR-0031 修订）。这次改动之前导入的图没有
+            // `preview.jpg`，后台补一遍：解码整张图要几百毫秒，不能在屏保启动的
+            // 那 0.5 秒里做。只做正常启动——屏保进程只该画钟。
+            if is_normal_start {
+                let themes_dir = settings::themes_dir(&handle).ok();
+                let snapshot = handle
+                    .state::<AppState>()
+                    .settings
+                    .lock()
+                    .map(|loaded| loaded.clone())
+                    .ok();
+                if let (Some(dir), Some(snapshot)) = (themes_dir, snapshot) {
+                    std::thread::spawn(move || theme_preview::ensure_missing(&dir, &snapshot));
+                }
+            }
+
+            // 屏保到点前释放主应用的 WebView2（ADR-0032 修订）。
+            if is_normal_start {
+                screensaver::release_main_windows_before_saver(handle.clone());
             }
 
             let outcome = match args.intent {

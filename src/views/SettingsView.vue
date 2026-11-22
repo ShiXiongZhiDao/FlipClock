@@ -407,7 +407,7 @@ onBeforeUnmount(() => {
           <AppearancePage v-if="page === 'appearance'" />
           <TimePage v-else-if="page === 'time'" />
           <SoundPage v-else-if="page === 'sound'" />
-          <ScreenSaverPage v-else-if="page === 'screensaver'" />
+          <ScreenSaverPage v-else-if="page === 'screensaver'" :settling="saverPending" />
           <SystemPage v-else />
         </div>
 

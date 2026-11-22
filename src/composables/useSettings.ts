@@ -12,6 +12,7 @@ import { isTauri } from "../lib/env";
 import { applyLanguage } from "../lib/i18n";
 import { ensureProfiles, profileOf } from "../lib/theme/profile";
 import { settingsPatchOf } from "../lib/settingsPatch";
+import { readBoot } from "../types/boot";
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
@@ -60,6 +61,13 @@ const settings = reactive<Settings>(defaultSettings());
 const loaded = ref(false);
 const error = ref<string | null>(null);
 
+/**
+ * 偏好基线：记录「加载时的值」，用来区分「加载配置」与「用户切换」。
+ * 用对象包一层：泛型参数没法按引用传递。见下面的 watchPreference。
+ */
+const languageBaseline: { value: Settings["ui"]["language"] | null } = { value: null };
+const appearanceBaseline: { value: Settings["ui"]["appearance"] | null } = { value: null };
+
 let loading: Promise<void> | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 /** 读盘/重载期间挂起防抖保存，避免把补齐的默认值写回磁盘。 */
@@ -89,24 +97,6 @@ async function flush() {
   }
 }
 
-watch(
-  settings,
-  () => {
-    // 读盘/重载期间补的默认值只留在内存（ADR-0022：缺失按默认运行，不静默写回）。
-    if (!loaded.value || hydrating) return;
-    clearTimeout(timer);
-    timer = setTimeout(flush, 200);
-  },
-  { deep: true },
-);
-
-// 字体库的增删改名会直接决定哪些导入字体能加载；字体管理器只认这一份快照。
-watch(
-  () => settings.appearance.fonts,
-  (fonts) => setFontLibrary(fonts),
-  { deep: true, immediate: true },
-);
-
 /**
  * 界面偏好的统一监听。
  *
@@ -133,25 +123,6 @@ function watchPreference<T>(
     { immediate: true },
   );
 }
-
-// 语言：切换界面文字要立刻生效，托盘重建走另一条命令，不跟 save_settings 走。
-const languageBaseline: { value: Settings["ui"]["language"] | null } = { value: null };
-watchPreference(
-  () => settings.ui.language,
-  applyLanguage,
-  languageBaseline,
-  (language) => trackFeatureToggled("language", language !== "system"),
-);
-
-// 外观：立刻改写 <html> 的 data-appearance（CSS 只认它）。窗口主题不参与——
-// 运行期改它动不了 prefers-color-scheme，见 lib/appearance.ts 的说明。
-const appearanceBaseline: { value: Settings["ui"]["appearance"] | null } = { value: null };
-watchPreference(
-  () => settings.ui.appearance,
-  applyAppearance,
-  appearanceBaseline,
-  trackUiAppearance,
-);
 
 /**
  * 把远端的外观与每个主题的钟面配置合并进来。
@@ -202,6 +173,60 @@ function applyRemoteSettings(remote: Settings): void {
   languageBaseline.value = settings.ui.language;
   appearanceBaseline.value = settings.ui.appearance;
 }
+
+/**
+ * 首帧配置（ADR-0030）。
+ *
+ * 屏保与全屏时钟的窗口在 webview 画出第一帧之前就 show()，而 `get_settings` 要等
+ * 一次 IPC 往返。只靠它的话，第一帧画的是 `defaultSettings()` 的经典碳灰，屏保
+ * 一出现会先闪一下再切到用户选的主题。Rust 建窗口时把内存里那份配置随初始化
+ * 脚本注入了，这里在挂任何监听之前先落上，第一帧就是对的。
+ *
+ * 只当**初值**用：`load()` 仍会走一遍 `get_settings`（两者同源，正常不会二次变化）。
+ * 这里刻意不设 `loaded = true`：`load()` 还负责初始化主题图片与字体的根路径，
+ * 提前短路会让自定义主题的背景图和导入字体永远不加载——那比闪一下更糟。
+ */
+const bootSettings = readBoot().settings;
+if (bootSettings) {
+  applyRemoteSettings(bootSettings);
+}
+
+// 落了初值再挂监听，顺序不能反：反了的话 `immediate` 拿到的还是默认值，
+// 而首帧配置本身会被当成「用户改动」走一次落盘。
+watch(
+  settings,
+  () => {
+    // 读盘/重载期间补的默认值只留在内存（ADR-0022：缺失按默认运行，不静默写回）。
+    if (!loaded.value || hydrating) return;
+    clearTimeout(timer);
+    timer = setTimeout(flush, 200);
+  },
+  { deep: true },
+);
+
+// 字体库的增删改名会直接决定哪些导入字体能加载；字体管理器只认这一份快照。
+watch(
+  () => settings.appearance.fonts,
+  (fonts) => setFontLibrary(fonts),
+  { deep: true, immediate: true },
+);
+
+// 语言：切换界面文字要立刻生效，托盘重建走另一条命令，不跟 save_settings 走。
+watchPreference(
+  () => settings.ui.language,
+  applyLanguage,
+  languageBaseline,
+  (language) => trackFeatureToggled("language", language !== "system"),
+);
+
+// 外观：立刻改写 <html> 的 data-appearance（CSS 只认它）。窗口主题不参与——
+// 运行期改它动不了 prefers-color-scheme，见 lib/appearance.ts 的说明。
+watchPreference(
+  () => settings.ui.appearance,
+  applyAppearance,
+  appearanceBaseline,
+  trackUiAppearance,
+);
 
 /**
  * 整体重读配置：预览窗口关闭、配置包导入后都走这里。

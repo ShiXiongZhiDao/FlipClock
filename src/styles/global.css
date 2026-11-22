@@ -23,6 +23,22 @@ body {
   overflow: hidden;
 }
 
+/* 沉浸式窗口的底就是当前主题（ADR-0031）：钟面画出来之前视线落在这块上，
+   不能是界面的 --ui-bg（浅色外观下会比钟面亮一大截）。有背景图的主题再铺一张
+   160px 缩略图，往 html 上铺、body 让开，这样淡入的钟面是从模糊照片上浮出来的。
+   属性与变量由 index.html 的 <head> 脚本按启动载荷设置，设置窗口不会有它们。 */
+html[data-boot-surface] {
+  background-color: var(--fc-boot-bg, #0d0f10);
+  background-image: var(--fc-boot-image, none);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+html[data-boot-surface] body {
+  background: transparent;
+}
+
 button {
   font: inherit;
   color: inherit;

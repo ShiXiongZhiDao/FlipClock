@@ -20,7 +20,7 @@ It contains:
   brightness, sound)
 - The current theme
 - Preferences: interface language, UI appearance, monitor mode, no-argument launch,
-  close-to-tray
+  keeping the app in the tray after closing
 
 It does **not** contain the screen saver registration or rollback point, and it does not
 contain autostart — those live in the registry.

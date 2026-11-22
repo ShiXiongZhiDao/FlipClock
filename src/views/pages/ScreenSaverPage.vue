@@ -12,11 +12,14 @@ const {
   status,
   statusError,
   busy,
+  justInstalled,
   refresh,
   install: installComponent,
   restore: restoreComponent,
   openWindowsSettings,
 } = useScreensaverStatus();
+
+const props = defineProps<{ settling?: boolean }>();
 
 const message = ref<{ tone: "ok" | "err"; text: string } | null>(null);
 let messageTimer: ReturnType<typeof setTimeout> | undefined;
@@ -24,6 +27,7 @@ let messageTimer: ReturnType<typeof setTimeout> | undefined;
 const uiState = computed(() => saverUiState(status.value));
 
 const statusInfo = computed(() => {
+  if (props.settling) return null;
   const state = uiState.value;
   if (!state) return null;
   const meta = SAVER_STATE_UI[state];
@@ -31,6 +35,7 @@ const statusInfo = computed(() => {
 });
 
 const primaryLabel = computed(() => {
+  if (props.settling) return null;
   const state = uiState.value;
   if (!state) return null;
   const key = SAVER_STATE_UI[state].pageAction;
@@ -47,7 +52,15 @@ const windowsState = computed(() => {
   return value.windowsEnabled ? t("saver.windowsOn") : t("saver.windowsOff");
 });
 
-const showEnable = computed(() => saverWindowsOff(status.value));
+const showEnable = computed(() => !props.settling && saverWindowsOff(status.value));
+
+const versionLabel = computed(() => {
+  if (props.settling) return "—";
+  const state = status.value?.state;
+  if (state === "installed") return t("saver.versionMatch");
+  if (state === "outdated") return t("saver.versionMismatch");
+  return "—";
+});
 
 function notify(tone: "ok" | "err", text: string) {
   message.value = { tone, text };
@@ -117,6 +130,13 @@ onBeforeUnmount(() => clearTimeout(messageTimer));
 
     <p class="install-note">{{ t("saver.installNote") }}</p>
 
+    <p v-if="justInstalled" class="install-hint">
+      {{ t("saver.waitHint") }} ·
+      <button type="button" class="mini" @click="openSystemSettings">
+        {{ t("saver.open") }}
+      </button>
+    </p>
+
     <p v-if="statusError" class="msg err" :title="statusError">
       {{ t("saver.statusReadError") }}
       <button type="button" class="mini" @click="refresh">
@@ -174,15 +194,7 @@ onBeforeUnmount(() => clearTimeout(messageTimer));
         </span>
 
         <span class="kv-key">{{ t("saver.componentVersion") }}</span>
-        <span class="kv-value">
-          {{
-            status?.state === "installed"
-              ? t("saver.versionMatch")
-              : status?.state === "outdated"
-                ? t("saver.versionMismatch")
-                : "—"
-          }}
-        </span>
+        <span class="kv-value">{{ versionLabel }}</span>
 
         <span class="kv-key">{{ t("saver.rollbackPoint") }}</span>
         <span class="kv-value">
@@ -284,6 +296,13 @@ onBeforeUnmount(() => clearTimeout(messageTimer));
   font-size: 9.5px;
   line-height: 1.5;
   color: var(--ui-text-muted);
+}
+
+.install-hint {
+  margin: -6px 2px 14px;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--ui-text-secondary);
 }
 
 .msg {
