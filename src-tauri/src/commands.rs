@@ -93,7 +93,10 @@ pub async fn save_settings(
     settings::normalize_appearance(&mut guard.appearance);
     guard.screensaver = patch.screensaver;
     guard.launch = patch.launch;
-    guard.system = patch.system;
+    // 自启初始化标记是后端独占的：前端会把它原样回传（types/settings.ts 标了只读），
+    // 但前端从旧版升上来时这份值可能缺失或过期，不能当真。
+    // 走 merge_system 而不是整体替换，规则才有测试兜着（settings.rs 的同名函数）。
+    guard.system = settings::merge_system(&guard.system, patch.system);
     guard.ui = patch.ui;
 
     settings::save(&app, &guard)?;

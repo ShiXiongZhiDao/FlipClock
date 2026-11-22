@@ -39,14 +39,42 @@ const BUNDLE_MAX_ENTRIES: usize = 512;
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
+/// 能导入的最老配置包 schema。
+///
+/// 配置包从 schema 4 开始存在（ADR-0027）；此后每次升版都只**新增**字段，
+/// 读取侧的 `serde(default)` 会把缺的补上，所以旧包能安全导入。
+/// 反过来必须拒绝：包比程序新时，里面有本程序不认识的字段，静默丢掉等于替用户改配置。
+const MIN_BUNDLE_SCHEMA: u32 = 4;
+
+fn bundle_schema_supported(schema_version: u32) -> bool {
+    (MIN_BUNDLE_SCHEMA..=SCHEMA_VERSION).contains(&schema_version)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BundleSettings {
     pub appearance: Appearance,
     pub screensaver: settings::ScreenSaverSettings,
     pub launch: settings::LaunchSettings,
-    pub system: settings::SystemSettings,
+    pub system: BundleSystem,
     pub ui: settings::UiSettings,
+}
+
+/// 配置包里的系统偏好。
+///
+/// 只带 `closeToTray`。自启初始化标记是**本机的一次性判定**：跟着包走到另一台
+/// 机器，等于把「这台机器已经问过」这个事实搬过去。这里用独立结构而不是复用
+/// `SystemSettings`，是为了在类型层面就让那个字段进不了包——而不是导出时
+/// 记得抹掉、导入时记得跳过（两条都得靠人不忘）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleSystem {
+    #[serde(default = "close_to_tray_default")]
+    pub close_to_tray: bool,
+}
+
+fn close_to_tray_default() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,7 +296,9 @@ fn export_bundle_with(settings: &Settings, io: &BundleIo, path: &Path) -> Result
             appearance: portable.appearance.clone(),
             screensaver: portable.screensaver.clone(),
             launch: portable.launch.clone(),
-            system: portable.system.clone(),
+            system: BundleSystem {
+                close_to_tray: portable.system.close_to_tray,
+            },
             ui: portable.ui.clone(),
         },
     };
@@ -444,7 +474,8 @@ fn read_bundle(path: &Path) -> Result<BundleArchive, String> {
     let manifest_bytes = read_entry(&mut archive, MANIFEST_NAME, MANIFEST_MAX_BYTES)?;
     let mut manifest: BundleManifest =
         serde_json::from_slice(&manifest_bytes).map_err(format_error)?;
-    if manifest.format_version != BUNDLE_FORMAT_VERSION || manifest.schema_version != SCHEMA_VERSION
+    if manifest.format_version != BUNDLE_FORMAT_VERSION
+        || !bundle_schema_supported(manifest.schema_version)
     {
         return Err(AppError::ConfigBundleUnsupportedVersion {
             format_version: manifest.format_version,
@@ -1073,7 +1104,9 @@ fn import_bundle_with(
     if selection.preferences {
         next.screensaver = prepared.bundle.screensaver.clone();
         next.launch = prepared.bundle.launch.clone();
-        next.system = prepared.bundle.system.clone();
+        // 只搬托盘偏好。自启初始化标记根本不在 BundleSystem 里，
+        // 所以「从别人的包导入把本机默认自启判定改掉」这件事在类型上就发生不了。
+        next.system.close_to_tray = prepared.bundle.system.close_to_tray;
         next.ui = prepared.bundle.ui.clone();
     }
     settings::normalize_appearance(&mut next.appearance);
@@ -1095,6 +1128,55 @@ fn import_bundle_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bundle_schema_gate_accepts_older_additive_versions() {
+        // 1.1.1 导出的是 schema 4；升到 5 之后它必须还能导入，
+        // 否则每升一次 schema，用户手里已经导出的包就全废了。
+        assert!(bundle_schema_supported(4));
+        assert!(bundle_schema_supported(SCHEMA_VERSION));
+        // 比程序新的包里有不认识的字段，必须拒绝。
+        assert!(!bundle_schema_supported(SCHEMA_VERSION + 1));
+        // 配置包出现之前没有更老的包，不假装兼容。
+        assert!(!bundle_schema_supported(3));
+    }
+
+    #[test]
+    fn bundle_never_carries_the_local_autostart_marker() {
+        // 老包里可能带 autostartInitialized；结构里没有这个字段，读进来即丢弃。
+        let parsed: BundleSystem =
+            serde_json::from_str(r#"{"closeToTray":false,"autostartInitialized":true}"#).unwrap();
+        assert!(!parsed.close_to_tray);
+    }
+
+    /// 真实场景：v1.1.1 导出的包是 schema 4，`system` 里还带着 autostartInitialized。
+    /// 升到 schema 5 之后它必须能读进来——否则「导出配置包」这个功能会在每次升版时
+    /// 把用户手里的包全部作废。
+    #[test]
+    fn a_schema_4_manifest_from_1_1_1_still_parses() {
+        let json = r#"{
+            "formatVersion": 1,
+            "schemaVersion": 4,
+            "appVersion": "1.1.1",
+            "exportedAt": 0,
+            "settings": {
+                "appearance": {
+                    "theme": "classic-dark",
+                    "customThemes": [],
+                    "fonts": [],
+                    "profiles": {}
+                },
+                "screensaver": { "monitorMode": "primary" },
+                "launch": { "noArgMode": "settings" },
+                "system": { "closeToTray": false, "autostartInitialized": true },
+                "ui": { "language": "system", "appearance": "system" }
+            }
+        }"#;
+        let manifest: BundleManifest = serde_json::from_str(json).unwrap();
+        assert!(bundle_schema_supported(manifest.schema_version));
+        // 多出来的后端标记被忽略，托盘偏好照读。
+        assert!(!manifest.settings.system.close_to_tray);
+    }
 
     #[test]
     fn entry_validation_rejects_traversal() {
@@ -1259,6 +1341,9 @@ mod tests {
         };
 
         let mut source = Settings::default();
+        // 源配置的自启判定为 false（相当于「那台机器是全新安装」）。
+        // 导入方不能被它影响：这个标记只属于本机。
+        source.system.autostart_initialized = false;
         source.appearance.custom_themes = vec![sample_theme(
             "custom-a",
             "测试主题",
@@ -1300,6 +1385,11 @@ mod tests {
         assert_eq!(result.themes, 1);
         assert_eq!(result.fonts, 1);
         assert!(result.skipped.is_empty());
+        // 本机的自启判定不被包影响：source 是 false，导入后仍需保持 true。
+        assert!(
+            imported.system.autostart_initialized,
+            "配置包不能把本机的默认自启判定改成「重新放开」"
+        );
         assert_eq!(imported.appearance.custom_themes.len(), 1);
         assert_eq!(imported.appearance.custom_themes[0].id, "custom-a");
         assert_eq!(imported.appearance.fonts.len(), 1);

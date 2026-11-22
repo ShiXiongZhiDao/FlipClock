@@ -34,6 +34,10 @@ pub fn run() {
     );
     // 卸载器的钩子也走独立进程：托盘实例还在跑的时候，它必须能把屏保选择还回去。
     let is_headless_restore = matches!(args.intent, ParsedLaunch::RestoreScreensaver);
+    // 只有「正常启动」才做应用级副作用：单实例、托盘、自启判定、刷新屏保组件。
+    // 屏保进程与卸载钩子都是系统拉起来只干一件事的；顺手做这些会改到用户设置
+    // ——2026-11-22 审出的真事故：屏保进程把 Run 键改写成了 `FlipClock.scr --tray`。
+    let is_normal_start = !is_saver && !is_headless_restore;
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -47,7 +51,7 @@ pub fn run() {
             )
             .build(),
         );
-    if !is_saver && !is_headless_restore {
+    if is_normal_start {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             let _ = screensaver::open_settings_window(app);
         }));
@@ -57,9 +61,33 @@ pub fn run() {
         .setup(move |app| {
             let handle = app.handle().clone();
 
-            let loaded = settings::load(&handle);
+            let mut loaded = settings::load(&handle);
             let no_arg_mode = loaded.launch.no_arg_mode;
             let debug_windowed = args.debug_windowed;
+
+            // 全新安装默认开启自启，只做一次：标记在 settings.json 里，落盘后不再干预。
+            // 老配置（serde 缺省 initialized=true）、用户主动关掉、任务管理器禁用都不碰。
+            //
+            // 只有真的落定才写标记：写 Run 键失败时把 initialized 留成 false，下次启动
+            // 重试。「尽量让时钟开机就在」不该被一次偶发失败永久放弃——记 true 落盘
+            // 等于宣布「问过了」，而那次其实没成功。
+            if is_normal_start && !loaded.system.autostart_initialized {
+                let mut settled = autostart::has_run_value();
+                if !settled {
+                    match autostart::set_enabled(true) {
+                        Ok(()) => settled = true,
+                        Err(error) => {
+                            eprintln!("FlipClock: 默认开启自启失败，下次启动再试：{error}")
+                        }
+                    }
+                }
+                if settled {
+                    loaded.system.autostart_initialized = true;
+                    if let Err(error) = settings::save(&handle, &loaded) {
+                        eprintln!("FlipClock: 自启初始化标记没能落盘：{error}");
+                    }
+                }
+            }
 
             handle.manage(AppState {
                 settings: Mutex::new(loaded),
@@ -77,18 +105,24 @@ pub fn run() {
             }
 
             // 托盘失败不该拖垮整个应用：没有托盘时时钟与屏保照常可用。
-            if !is_saver {
+            if is_normal_start {
                 if let Err(error) = tray::install(&handle) {
                     eprintln!("FlipClock: 托盘创建失败：{error}");
                 }
             }
             // 程序被移动过之后，注册表里的旧路径会让自启悄悄失效。
-            autostart::sync_command_line();
+            //
+            // 必须限定正常启动：屏保进程的 `current_exe()` 是 `FlipClock.scr`，
+            // 让它跑这一步会把 Run 键改写成 `"...\FlipClock.scr" --tray`——
+            // 组件一卸载，自启就指向一个不存在的文件，而界面上看不出任何异常。
+            if is_normal_start {
+                autostart::sync_command_line();
+            }
 
             // 更新只替换主程序，`.scr` 副本会停在上一版；这里把它赶上，
             // 免得 Windows 下次起屏保还是旧画面。丢到后台线程：要比对整份文件，
             // 不该挡住窗口出现。失败不打扰用户——系统页会显示「版本不匹配」。
-            if !is_saver {
+            if is_normal_start {
                 std::thread::spawn(|| match install::refresh_if_outdated() {
                     Ok(true) => eprintln!("FlipClock: 屏保组件已跟随主程序刷新"),
                     Ok(false) => {}

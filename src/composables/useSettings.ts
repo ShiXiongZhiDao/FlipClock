@@ -190,7 +190,7 @@ function applyRemoteUi(remote: Settings): void {
 }
 
 function applyRemoteSettings(remote: Settings): void {
-  settings.schemaVersion = remote.schemaVersion ?? 4;
+  settings.schemaVersion = remote.schemaVersion ?? 5;
   applyRemoteAppearance(remote);
   settings.system = {
     closeToTray: remote.system?.closeToTray ?? true,

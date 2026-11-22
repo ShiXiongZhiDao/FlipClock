@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::errors::AppError;
 
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// 时钟缩放比例的唯一边界；只作用于全屏时钟与屏保。
 /// 上限远大于「刚好铺满屏幕」的约 1.57 倍，超出部分会被屏幕裁切，这是用户的选择。
@@ -680,21 +680,51 @@ pub struct ScreenSaverSettings {
     pub monitor_mode: MonitorMode,
 }
 
-/// 系统集成。开机自启的**状态**不在这里存——它以注册表为准，
+/// 系统集成。开机自启的**开关状态**不在这里存——它以注册表为准，
 /// 否则用户在任务管理器里禁用之后，配置里还会写着「开启」。
+///
+/// 这里只有一个一次性标记：全新安装时自动开启自启，之后不再干预用户的选择。
+/// 它必须后端独占（见 commands.rs 的 save_settings），前端回写 system 段时不得清掉。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemSettings {
     /// 关闭设置窗口时隐藏到托盘，而不是退出整个应用。
     #[serde(default = "yes")]
     pub close_to_tray: bool,
+    /// 是否已经做过「默认自启」的初始化判定。
+    /// serde 缺省视为 true：老配置没有这个字段，说明用户用过 FlipClock，
+    /// 不能被新版本静默打开自启；只有 Settings::default()（全新安装）才是 false。
+    #[serde(default = "yes")]
+    pub autostart_initialized: bool,
 }
 
 impl Default for SystemSettings {
     fn default() -> Self {
         Self {
             close_to_tray: true,
+            autostart_initialized: true,
         }
+    }
+}
+
+impl SystemSettings {
+    /// 全新安装专用：还没决定过是否默认自启。
+    pub fn fresh() -> Self {
+        Self {
+            autostart_initialized: false,
+            ..Self::default()
+        }
+    }
+}
+
+/// 保存设置时合并 `system` 段：后端独占的标记保留本机的值，其余照前端给的替换。
+///
+/// 单独成一函数是为了能被测试覆盖。`save_settings` 要 `AppHandle`，单测里起不来，
+/// 而这正是「保存一次就把标记清掉、下次启动又重开自启」的入口——只靠读代码不算验过。
+pub fn merge_system(current: &SystemSettings, patch: SystemSettings) -> SystemSettings {
+    SystemSettings {
+        close_to_tray: patch.close_to_tray,
+        autostart_initialized: current.autostart_initialized,
     }
 }
 
@@ -792,20 +822,37 @@ pub fn fonts_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(dir)
 }
 
-/// 读取配置。任何一段损坏都只回退那一段，不拖垮整份配置。
+/// 全新安装的配置：关闭到托盘照旧，但自启还没做过初始化判定。
+///
+/// `load()` 读不到、也读不懂配置文件时都走这里。**「读不懂」也按全新安装处理**
+/// 是刻意的，不是漏判：损坏的文件里没有任何可信的用户选择，而本项目的取向是
+/// 「尽量让时钟开机就在」（2026-11-22 用户明确要求），所以宁可重新开一次自启，
+/// 也不让一个半截文件把用户永久留在「不自启」。
+///
+/// 代价：确实主动关过自启的用户，在配置损坏后会看到自启被重新打开一次；
+/// 标记随即落盘，之后不再重复。损坏的那份会被 `backup_corrupt` 改名留档，
+/// 所以这个「一次」不会变成每次启动都翻一遍。见 ADR-0012 修订段。
+fn fresh_settings() -> Settings {
+    let mut settings = Settings::default();
+    settings.system = SystemSettings::fresh();
+    settings
+}
+
+/// 读取配置。任何一段损坏都只回退那一段，不拖垮整份配置；
+/// 只有整份文件拿不到（不存在 / 读失败 / JSON 坏了）才退回 `fresh_settings()`。
 pub fn load(app: &AppHandle) -> Settings {
     let Some(path) = config_path(app) else {
-        return Settings::default();
+        return fresh_settings();
     };
     let Ok(text) = fs::read_to_string(&path) else {
-        return Settings::default();
+        return fresh_settings();
     };
 
     let value: serde_json::Value = match serde_json::from_str(&text) {
         Ok(value) => value,
         Err(_) => {
             backup_corrupt(&path);
-            return Settings::default();
+            return fresh_settings();
         }
     };
 
@@ -1358,5 +1405,71 @@ mod tests {
         let settings: Settings = serde_json::from_value(raw).unwrap();
         assert_eq!(settings.appearance.theme, "classic-dark");
         assert_eq!(settings.appearance.profiles.len(), BUILTIN_THEME_IDS.len());
+    }
+
+    /// 回归：默认自启只能发生在全新安装。老配置没这个字段时必须视为已初始化，
+    /// 否则用户升级后被静默打开自启——这比不开自启更糟。
+    #[test]
+    fn old_settings_are_treated_as_autostart_initialized() {
+        let raw = serde_json::json!({
+            "schemaVersion": 4,
+            "system": { "closeToTray": false }
+        });
+        let settings = settings_from_value(&raw);
+        assert!(settings.system.autostart_initialized);
+        assert!(!settings.system.close_to_tray);
+    }
+
+    #[test]
+    fn fresh_settings_opt_in_to_default_autostart() {
+        let settings = fresh_settings();
+        assert!(!settings.system.autostart_initialized);
+        assert_eq!(settings.schema_version, SCHEMA_VERSION);
+        // 其它默认行为不受影响。
+        assert!(settings.system.close_to_tray);
+    }
+
+    /// 回归：显式关闭过自启的用户，标记必须为 true，重启才不会再被默认打开。
+    #[test]
+    fn autostart_initialized_survives_round_trip() {
+        let mut settings = fresh_settings();
+        settings.system.autostart_initialized = true;
+        let json = serde_json::to_string(&settings).unwrap();
+        let raw: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(settings_from_value(&raw).system.autostart_initialized);
+    }
+
+    /// 回归：保存设置时前端会整段回传 `system`，后端独占的标记必须留住本机的值。
+    /// 清成默认值的后果不是「多开一次自启」，而是**每次保存设置都重开一次**。
+    #[test]
+    fn saving_settings_keeps_the_backend_owned_autostart_marker() {
+        let current = SystemSettings {
+            close_to_tray: false,
+            autostart_initialized: true,
+        };
+        let patch = SystemSettings {
+            close_to_tray: true,
+            autostart_initialized: false,
+        };
+
+        let merged = merge_system(&current, patch);
+
+        assert!(merged.close_to_tray, "前端的托盘偏好必须生效");
+        assert!(
+            merged.autostart_initialized,
+            "后端独占标记不能被前端的整段回传清掉"
+        );
+    }
+
+    /// 反方向也要锁住：本机还没判定过时，前端回传 true 不能替后端「假装问过了」。
+    #[test]
+    fn frontend_cannot_mark_autostart_as_initialized() {
+        let current = SystemSettings::fresh();
+        let patch = SystemSettings {
+            close_to_tray: true,
+            autostart_initialized: true,
+        };
+
+        assert!(!merge_system(&current, patch).autostart_initialized);
     }
 }

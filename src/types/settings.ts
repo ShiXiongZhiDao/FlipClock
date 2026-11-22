@@ -198,6 +198,9 @@ export interface Settings {
   };
   screensaver: { monitorMode: MonitorMode };
   /** 系统集成。开机自启的状态不在这里，它以注册表为准。 */
+  /** 系统集成。开机自启的状态不在这里，它以注册表为准。
+      `system` 只有一个前端可写的字段：`autostartInitialized` 是后端独占的一次性
+      判定，不下发给前端——没有字段就没有回写面（见 settings::merge_system）。 */
   system: { closeToTray: boolean };
   /** 界面文字语言。只影响文字，不影响钟面数字的字体。 */
   ui: { language: LanguagePreference; appearance: UiAppearance };
@@ -243,7 +246,7 @@ export function defaultSettings(): Settings {
     profiles[id] = { ...DEFAULT_CLOCK_PROFILE, sound: { ...DEFAULT_CLOCK_PROFILE.sound } };
   }
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     appearance: {
       theme: "classic-dark",
       customThemes: [],
@@ -252,6 +255,7 @@ export function defaultSettings(): Settings {
     },
     screensaver: { monitorMode: "primary" },
     launch: { noArgMode: "settings" },
+    // 只给 closeToTray。autostartInitialized 是后端独占的事实，前端连字段都没有。
     system: { closeToTray: true },
     ui: { language: "system", appearance: "system" },
   };

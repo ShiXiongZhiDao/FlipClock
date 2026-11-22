@@ -111,6 +111,15 @@ pub fn is_enabled() -> bool {
     true
 }
 
+/// Run 键里有没有值，不管任务管理器是否禁用。
+/// 默认初始化只认这个：被任务管理器禁用也是用户做过的选择，不该被覆盖。
+///
+/// 名字刻意不叫 `is_configured`——「配置过没有」会把「键不存在但曾经主动关掉」
+/// 也算进去，正是它判不出来的那一种情况。
+pub fn has_run_value() -> bool {
+    read(RUN_KEY, VALUE_NAME).is_some_and(|bytes| !bytes.is_empty())
+}
+
 pub fn set_enabled(enabled: bool) -> Result<(), String> {
     let key = open(RUN_KEY, true)?;
     let name = wide(VALUE_NAME);
