@@ -16,13 +16,10 @@
 
 Windows 10/11 x64. Pick one:
 
-| Build | File | Notes |
-| --- | --- | --- |
-| Installed | [`FlipClock_1.1.1_x64-setup.exe`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-setup.exe) | Per-user install; no administrator rights; in-app updates |
-| Portable | [`FlipClock_1.1.1_x64-portable.zip`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-portable.zip) | Unzip and run; updates must be downloaded manually |
-
-[GitHub Releases](https://github.com/ShiXiongZhiDao/FlipClock/releases) ·
-[Gitee mirror](https://gitee.com/ShiXiongZhiDao/FlipClock/releases)
+| Build | File | Notes | Channel |
+| --- | --- | --- | --- |
+| Installed | `FlipClock_<version>_x64-setup.exe` | Per-user install, no administrator rights needed; in-app updates | [Gitee](https://gitee.com/ShiXiongZhiDao/FlipClock/releases) · [GitHub](https://github.com/ShiXiongZhiDao/FlipClock/releases) |
+| Portable | `FlipClock_<version>_x64-portable.zip` | Unzip and run; updates must be downloaded manually | [Gitee](https://gitee.com/ShiXiongZhiDao/FlipClock/releases) · [GitHub](https://github.com/ShiXiongZhiDao/FlipClock/releases) |
 
 WebView2 is included with Windows 10/11. If it is missing, the installer fetches it.
 
@@ -82,7 +79,7 @@ Full steps: [Quick start](./docs/guide/en/quick-start.md) ·
 
 ## Requirements and limits
 
-- **Windows 10/11 x64 only.** No macOS, Linux, or Windows ARM build.
+- **Self-tested on Windows 10/11 x64.** Other platforms can be built from source but are untested.
 - **WebView2 required.** It ships with Windows 10/11; the installer fetches it if missing.
 - **No administrator rights.** The app installs per user in `%LOCALAPPDATA%\FlipClock`, and
   the screen saver registers under the current user.
@@ -96,18 +93,8 @@ Full steps: [Quick start](./docs/guide/en/quick-start.md) ·
 
 ## Privacy
 
-- **No personal data.** No account, no name or email, no device or installation ID, and no
-  access to your files, clipboard, camera, or microphone.
-- **Anonymous usage analytics.** Official builds send five anonymous events (app start,
-  configuration snapshot, Settings opened, feature toggled, update check) to Aptabase. No
-  free text, no persisted identifier, no in-app switch. Builds from source without the app
-  key send nothing.
-- **Network requests.** An update check is attempted after the Settings window opens, and
-  the About section loads three images. There is no sync.
-- **Local data.** Settings, themes, fonts, and imported images stay in
-  `%APPDATA%\com.dd.shixiongzhidao\`; imported files are copied there.
-
-Full details: [Privacy](./docs/guide/en/privacy.md).
+No personal data is collected; official builds send three anonymous usage events.
+See the [privacy notice](./docs/guide/en/privacy.md).
 
 ## FAQ and documentation
 

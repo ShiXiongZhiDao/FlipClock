@@ -17,7 +17,7 @@ import { useSettings } from "../composables/useSettings";
 import { useStudioLauncher } from "../composables/useStudioLauncher";
 import { useTheme } from "../composables/useTheme";
 import { useToast } from "../composables/useToast";
-import { trackAppStarted, trackSettingsPageViewed } from "../lib/analytics";
+import { trackAppStarted } from "../lib/analytics";
 import { isTauri } from "../lib/env";
 import { errorText, t, type MessageKey } from "../lib/i18n";
 import { themeLabel } from "../lib/theme/labels";
@@ -190,7 +190,6 @@ onMounted(async () => {
   // 统计在配置就绪后发：快照要带用户当前的配置。去重由 analytics.ts 管
   // （localStorage + 时间窗），因为多个 WebView 各有自己的模块状态。
   trackAppStarted(settings);
-  trackSettingsPageViewed();
 
   if (isTauri()) {
     versionText.value = await getVersion().catch(() => "");

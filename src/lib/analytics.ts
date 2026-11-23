@@ -1,8 +1,7 @@
 /**
  * 匿名使用统计（ADR-0019）。
  *
- * 只上报开发者判断产品方向需要的少量事实：应用被启动、设置窗口被看过、
- * 哪个功能被切换、有没有查更新，以及启动时用户实际在用什么样的时钟。
+ * 只上报三件事：应用被启动、启动时用户实际在用什么样的时钟、有没有安装屏保。
  * 没有用户 ID、设备 ID、使用时长，也不上报任何自由文本。
  *
  * 插件本身不自动采集事件、也没有运行时开关；所有事件都从这里手动发出。
@@ -18,8 +17,10 @@ import { profileOf } from "./theme/profile";
 export const Events = {
   AppStarted: "app_started",
   ConfigurationSnapshot: "configuration_snapshot",
-  SettingsPageViewed: "settings_page_viewed",
   FeatureToggled: "feature_toggled",
+  /** @deprecated 2026-11-23 精简：设置窗口打开率无决策价值，与启动数重复。 */
+  SettingsPageViewed: "settings_page_viewed",
+  /** @deprecated 2026-11-23 精简：更新检查属运维指标，不服务产品方向。 */
   UpdateChecked: "update_checked",
 } as const;
 
@@ -30,11 +31,7 @@ const ALLOWED: Record<string, ReadonlySet<string | number>> = {
   // 从内置主题表派生：新增主题时不必记得同步这里，也不会漏记成 [redacted]。
   theme: new Set<string>(BUILTIN_THEME_IDS),
   digitLayout: new Set(["per-digit", "per-pair"]),
-  showSeconds: new Set([0, 1]),
-  showDate: new Set([0, 1]),
-  feature: new Set(["screensaver", "sound", "language", "uiAppearance"]),
-  // 三态原样上报：压成 0/1 会让「浅色」和「深色」在看板上无法区分。
-  state: new Set(["system", "light", "dark"]),
+  feature: new Set(["screensaver"]),
   enabled: new Set([0, 1]),
 };
 
@@ -94,40 +91,10 @@ export function trackAppStarted(clock: import("../types/settings").Settings): vo
   track(Events.ConfigurationSnapshot, {
     theme: clock.appearance.theme,
     digitLayout: profile.digitLayout,
-    showSeconds: profile.showSeconds ? 1 : 0,
-    showDate: profile.showDate ? 1 : 0,
   });
 }
 
-/**
- * 设置页被打开。ADR-0019 的口径是「一次会话一次」，而设置窗口每次关闭是
- * destroy、重开是新建窗口，所以必须跨窗口去重，理由同 trackAppStarted。
- */
-const SETTINGS_VIEW_KEY = "flipclock.analytics.settingsViewedAt";
-
-export function trackSettingsPageViewed(): void {
-  try {
-    const last = Number(localStorage.getItem(SETTINGS_VIEW_KEY) ?? 0);
-    if (Date.now() - last < START_WINDOW_MS) return;
-    localStorage.setItem(SETTINGS_VIEW_KEY, String(Date.now()));
-  } catch {
-    // 存储不可用也照发，理由同上。
-  }
-  track(Events.SettingsPageViewed);
-}
-
-export function trackFeatureToggled(
-  feature: "screensaver" | "sound" | "language",
-  enabled: boolean,
-): void {
+/** 目前只剩屏保安装这一个功能事件；参数仍留联合类型，新增时不必改调用签名。 */
+export function trackFeatureToggled(feature: "screensaver", enabled: boolean): void {
   track(Events.FeatureToggled, { feature, enabled: enabled ? 1 : 0 });
-}
-
-/** 界面外观是三态，不能套用「开/关」那套布尔埋点。 */
-export function trackUiAppearance(appearance: "system" | "light" | "dark"): void {
-  track(Events.FeatureToggled, { feature: "uiAppearance", state: appearance });
-}
-
-export function trackUpdateChecked(): void {
-  track(Events.UpdateChecked);
 }

@@ -8,8 +8,8 @@ microphone.
 
 ## Anonymous usage analytics
 
-Official builds send five anonymous events: app start, a snapshot of the clock configuration,
-Settings opened, a feature toggled, and an update check. No free text is sent. A temporary
+Official builds send three anonymous events: app start, a snapshot of the clock configuration
+(theme and digit layout), and the screen saver being installed. No free text is sent. A temporary
 session ID groups events from one run; it lives in memory, is not written to disk, and is
 not a user identifier. Events go to Aptabase (`eu.aptabase.com`), a third-party analytics
 service. Builds compiled from source without the app key send nothing. There is no in-app

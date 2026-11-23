@@ -16,13 +16,10 @@
 
 Windows 10/11 x64。二选一：
 
-| 形态 | 文件 | 说明 |
-| --- | --- | --- |
-| 安装版 | [`FlipClock_1.1.1_x64-setup.exe`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-setup.exe) | 按当前用户安装，不需要管理员权限；应用内更新 |
-| 便携版 | [`FlipClock_1.1.1_x64-portable.zip`](https://github.com/ShiXiongZhiDao/FlipClock/releases/download/v1.1.1/FlipClock_1.1.1_x64-portable.zip) | 解压即用；新版本要手动下载 |
-
-[GitHub Releases](https://github.com/ShiXiongZhiDao/FlipClock/releases) ·
-[Gitee 镜像](https://gitee.com/ShiXiongZhiDao/FlipClock/releases)
+| 形态 | 文件 | 说明 | 渠道 |
+| --- | --- | --- | --- |
+| 安装版 | `FlipClock_<版本号>_x64-setup.exe` | 按当前用户安装，安装无需管理员权限；支持应用内更新 | [Gitee](https://gitee.com/ShiXiongZhiDao/FlipClock/releases) · [GitHub](https://github.com/ShiXiongZhiDao/FlipClock/releases) |
+| 便携版 | `FlipClock_<版本号>_x64-portable.zip` | 解压即用；新版本需手动下载 | [Gitee](https://gitee.com/ShiXiongZhiDao/FlipClock/releases) · [GitHub](https://github.com/ShiXiongZhiDao/FlipClock/releases) |
 
 WebView2 随 Windows 10/11 提供；缺失时安装器会拉取。
 
@@ -78,7 +75,7 @@ FlipClock 是 Windows 桌面上的机械翻页钟，**也是**真正注册到 Wi
 
 ## 适用范围与限制
 
-- **自测 Windows 10/11 x64。** 没有 macOS、Linux 或 Windows ARM 版本。
+- **自测支持 Windows 10/11 x64。** 其他平台可从源码自行构建，但未经自测。
 - **需要 WebView2。** Windows 10/11 自带；缺失时安装器会拉取。
 - **不需要管理员权限。** 应用按当前用户装到 `%LOCALAPPDATA%\FlipClock`，屏保也注册在
   当前用户下。
@@ -89,16 +86,7 @@ FlipClock 是 Windows 桌面上的机械翻页钟，**也是**真正注册到 Wi
 
 ## 隐私
 
-- **不收集个人隐私数据。** 没有账号，不收集姓名或邮箱，没有设备或安装标识，也不读取
-  文件、剪贴板、摄像头或麦克风。
-- **匿名使用统计。** 官方构建会发送五类匿名事件（启动、配置快照、打开设置、切换功能、
-  检查更新）到 Aptabase。不发送自由文本，没有持久标识，应用内没有开关。源码自建且未配置
-  app key 时一条也不发。
-- **网络请求。** 设置窗口出现后会检查一次更新，关于页会加载三张图片。没有同步。
-- **本地数据。** 设置、主题、字体与导入的图片都在 `%APPDATA%\com.dd.shixiongzhidao\`；
-  导入的文件会复制进去。
-
-完整说明：[隐私说明](./docs/guide/zh-CN/privacy.md)。
+不收集个人隐私数据；官方构建发送三类匿名使用统计事件。详见[隐私说明](./docs/guide/zh-CN/privacy.md)。
 
 ## 常见问题与文档
 

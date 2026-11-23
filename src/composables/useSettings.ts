@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { nextTick, reactive, ref, watch } from "vue";
 
-import { trackFeatureToggled, trackUiAppearance } from "../lib/analytics";
 import { applyAppearance } from "../lib/appearance";
 import { cloneJson } from "../lib/clone";
 import { initFontAssets, setFontLibrary } from "../lib/fonts";
@@ -61,13 +60,6 @@ const settings = reactive<Settings>(defaultSettings());
 const loaded = ref(false);
 const error = ref<string | null>(null);
 
-/**
- * 偏好基线：记录「加载时的值」，用来区分「加载配置」与「用户切换」。
- * 用对象包一层：泛型参数没法按引用传递。见下面的 watchPreference。
- */
-const languageBaseline: { value: Settings["ui"]["language"] | null } = { value: null };
-const appearanceBaseline: { value: Settings["ui"]["appearance"] | null } = { value: null };
-
 let loading: Promise<void> | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 /** 读盘/重载期间挂起防抖保存，避免把补齐的默认值写回磁盘。 */
@@ -98,30 +90,11 @@ async function flush() {
 }
 
 /**
- * 界面偏好的统一监听。
- *
- * 两件事必须一起做：立刻生效（比 200ms 的落盘防抖早），以及**只在值真的偏离
- * 加载时的值**才记一次埋点。watch 回调在微任务里跑，可能晚于 load() 写基线，
- * 所以比较的是值而不是布尔标志——否则「加载配置」会被误记成「用户切换」。
- * 基线用对象包一层：泛型参数没法按引用传递。
+ * 界面偏好的统一监听：值一变就立刻生效，比 200ms 的落盘防抖早。
+ * 只做生效这一件事——此前用于埋点的「加载基线」已随埋点精简一并移除。
  */
-function watchPreference<T>(
-  read: () => T,
-  apply: (value: T) => void,
-  baseline: { value: T | null },
-  track: (value: T) => void,
-): void {
-  watch(
-    read,
-    (value) => {
-      apply(value);
-      if (baseline.value !== null && value !== baseline.value) {
-        track(value);
-        baseline.value = value;
-      }
-    },
-    { immediate: true },
-  );
+function watchPreference<T>(read: () => T, apply: (value: T) => void): void {
+  watch(read, (value) => apply(value), { immediate: true });
 }
 
 /**
@@ -170,8 +143,6 @@ function applyRemoteSettings(remote: Settings): void {
   settings.launch = remote.launch ?? settings.launch;
   applyRemoteUi(remote);
   settings.registration = remote.registration;
-  languageBaseline.value = settings.ui.language;
-  appearanceBaseline.value = settings.ui.appearance;
 }
 
 /**
@@ -212,21 +183,11 @@ watch(
 );
 
 // 语言：切换界面文字要立刻生效，托盘重建走另一条命令，不跟 save_settings 走。
-watchPreference(
-  () => settings.ui.language,
-  applyLanguage,
-  languageBaseline,
-  (language) => trackFeatureToggled("language", language !== "system"),
-);
+watchPreference(() => settings.ui.language, applyLanguage);
 
 // 外观：立刻改写 <html> 的 data-appearance（CSS 只认它）。窗口主题不参与——
 // 运行期改它动不了 prefers-color-scheme，见 lib/appearance.ts 的说明。
-watchPreference(
-  () => settings.ui.appearance,
-  applyAppearance,
-  appearanceBaseline,
-  trackUiAppearance,
-);
+watchPreference(() => settings.ui.appearance, applyAppearance);
 
 /**
  * 整体重读配置：预览窗口关闭、配置包导入后都走这里。
@@ -310,7 +271,6 @@ function toggleSound() {
   if (profile.sound.enabled && profile.sound.volume <= 0) {
     profile.sound.volume = 0.6;
   }
-  trackFeatureToggled("sound", profile.sound.enabled);
 }
 
 /**
