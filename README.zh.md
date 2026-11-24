@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue" alt="Windows 10/11 x64">
   <img src="https://img.shields.io/badge/docs-zh%20%C2%B7%20en-orange" alt="中英文文档">
   <img src="https://img.shields.io/badge/privacy-no%20personal%20data-green" alt="不收集个人隐私数据">
-  <img src="https://img.shields.io/badge/release-v1.1.1-green" alt="v1.1.1">
+  <img src="https://img.shields.io/badge/release-v1.1.2-green" alt="v1.1.2">
 </p>
 
 <p align="center"><img src="./assets/screenshots/clock-classic-dark.jpg" alt="FlipClock 全屏时钟，经典深色两位一卡" width="880"></p>

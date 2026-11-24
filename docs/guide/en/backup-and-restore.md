@@ -45,9 +45,9 @@ stops.
 
 ## Version compatibility
 
-Only bundles with format 1 and schema 4 are accepted — that is, bundles exported by
-FlipClock 1.1.1. Bundles from other versions are rejected with a message; there is no
-downgrade or migration path.
+Bundles with format 1 and schema 4 through 5 are accepted (FlipClock 1.1.2 exports
+schema 5). Older or newer bundles are rejected with a message; there is no downgrade or
+migration path.
 
 ## Limits
 

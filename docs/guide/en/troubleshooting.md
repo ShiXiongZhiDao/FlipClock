@@ -59,7 +59,8 @@ added or removed, a running saver rebuilds its windows.
 
 ## Config import fails
 
-- Only bundles from FlipClock 1.1.1 (format 1, schema 4) are accepted.
+- Only bundles with format 1 and schema 4 through 5 are accepted (FlipClock 1.1.2
+  exports schema 5).
 - Import merges custom themes and fonts; it never deletes what is already on the machine.
   Name conflicts become copies.
 - Check `backups\pre-import.zip` in the configuration directory if you need to go back.

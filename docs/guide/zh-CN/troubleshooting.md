@@ -50,6 +50,6 @@
 
 ## 配置导入失败
 
-- 只接受 FlipClock 1.1.1 导出的包（格式 1、schema 4）。
+- 只接受格式 1、schema 4 到 5 的包（FlipClock 1.1.2 起导出 schema 5）。
 - 导入会合并自定义主题与字体，不删除本机已有内容；重名会变成副本。
 - 需要回退时，看配置目录里的 `backups\pre-import.zip`。
